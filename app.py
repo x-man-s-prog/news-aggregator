@@ -407,14 +407,16 @@ def manual_refresh():
     return jsonify({'status': 'جاري التحديث...', 'message': 'بدأ التحديث اليدوي'})
 
 
+# ========== تشغيل تلقائي عند الاستيراد (للخوادم) ==========
+
+init_db()
+_worker = threading.Thread(target=background_worker, daemon=True)
+_worker.start()
+
+
 # ========== التشغيل الرئيسي ==========
 
 if __name__ == '__main__':
-    init_db()
-
-    # بدء الخيط الخلفي
-    worker = threading.Thread(target=background_worker, daemon=True)
-    worker.start()
 
     hostname = _socket.gethostname()
     try:
