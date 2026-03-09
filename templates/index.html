@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <title>مجمّع الأخبار العالمي</title>
+    <style>
+        /* ===== متغيرات وأساسيات ===== */
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --card2: #263348;
+            --border: #334155;
+            --accent: #3b82f6;
+            --accent2: #60a5fa;
+            --green: #22c55e;
+            --yellow: #eab308;
+            --red: #ef4444;
+            --text: #f1f5f9;
+            --text2: #94a3b8;
+            --text3: #64748b;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', 'Cairo', 'Noto Kufi Arabic', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            font-size: 15px;
+        }
+        a { color: var(--accent2); text-decoration: none; }
+
+        /* ===== شريط علوي ===== */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(15,23,42,0.97);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+        }
+        .header-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0 8px;
+        }
+        .logo {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--accent2);
+            white-space: nowrap;
+        }
+        .logo span { color: var(--text2); font-weight: 400; font-size: 14px; }
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            padding: 6px 0 10px;
+            font-size: 12px;
+            color: var(--text3);
+            flex-wrap: wrap;
+        }
+        .stat { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+               animation: pulse 2s infinite; display: inline-block; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+        }
+        .stat-num { color: var(--accent2); font-weight: 600; }
+
+        /* ===== أدوات البحث والتصفية ===== */
+        .toolbar {
+            padding: 8px 16px 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            background: rgba(15,23,42,0.97);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 72px;
+            z-index: 99;
+            align-items: center;
+        }
+        .search-wrap {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+        .search-wrap input {
+            width: 100%;
+            padding: 9px 36px 9px 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-wrap input:focus { border-color: var(--accent); }
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text3);
+            pointer-events: none;
+        }
+        select {
+            padding: 9px 12px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+            max-width: 180px;
+        }
+        button {
+            padding: 9px 16px;
+            border-radius: var(--radius);
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-refresh {
+            background: var(--accent);
+            color: white;
+            white-space: nowrap;
+        }
+        .btn-refresh:hover { background: var(--accent2); }
+        .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ===== أزرار تبديل العرض ===== */
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 3px;
+        }
+        .view-btn {
+            padding: 5px 10px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text3);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: normal;
+        }
+        .view-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* ===== محتوى رئيسي ===== */
+        main { padding: 12px 16px; max-width: 1200px; margin: 0 auto; }
+
+        /* ===== حالات التحميل ===== */
+        #loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text2);
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== عرض القائمة (افتراضي) ===== */
+        #news-list.view-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* ===== عرض الشبكة ===== */
+        #news-list.view-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 14px;
+        }
+
+        /* ===== بطاقة الخبر ===== */
+        .news-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .news-card:hover {
+            border-color: var(--accent);
+            background: var(--card2);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+        .news-card.new-item {
+            border-right: 3px solid var(--green);
+        }
+
+        /* صورة البطاقة */
+        .card-image-wrap {
+            width: 100%;
+            aspect-ratio: 16/9;
+            overflow: hidden;
+            background: var(--bg);
+            flex-shrink: 0;
+        }
+        .card-image-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.3s;
+        }
+        .news-card:hover .card-image-wrap img {
+            transform: scale(1.03);
+        }
+
+        /* محتوى البطاقة */
+        .card-body {
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        /* في عرض القائمة: صورة على اليسار + نص على اليمين */
+        #news-list.view-list .news-card {
+            flex-direction: row;
+        }
+        #news-list.view-list .card-image-wrap {
+            width: 160px;
+            min-width: 160px;
+            aspect-ratio: unset;
+            height: auto;
+            min-height: 120px;
+            order: 2;
+        }
+        #news-list.view-list .card-body {
+            order: 1;
+            flex: 1;
+        }
+
+        .card-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .source-badge {
+            background: rgba(59,130,246,0.15);
+            color: var(--accent2);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(59,130,246,0.3);
+        }
+        .country-badge {
+            background: rgba(148,163,184,0.1);
+            color: var(--text3);
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+        }
+        .new-badge {
+            background: rgba(34,197,94,0.15);
+            color: var(--green);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid rgba(34,197,94,0.3);
+        }
+        .lang-badge {
+            background: rgba(234,179,8,0.1);
+            color: var(--yellow);
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.6;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .card-summary {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.6;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-original {
+            font-size: 12px;
+            color: var(--text3);
+            font-style: italic;
+            margin-bottom: 8px;
+            border-right: 2px solid var(--border);
+            padding-right: 8px;
+        }
+
+        .card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 8px;
+        }
+        .card-time {
+            font-size: 11px;
+            color: var(--text3);
+        }
+        .read-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: var(--accent2);
+            background: rgba(59,130,246,0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(59,130,246,0.2);
+            transition: all 0.2s;
+        }
+        .read-link:hover {
+            background: rgba(59,130,246,0.2);
+            color: white;
+        }
+
+        /* ===== تحميل المزيد ===== */
+        #load-more-wrap {
+            text-align: center;
+            padding: 20px 0 40px;
+        }
+        .btn-load-more {
+            background: var(--card);
+            color: var(--text2);
+            border: 1px solid var(--border);
+            padding: 12px 32px;
+            font-size: 14px;
+        }
+        .btn-load-more:hover { background: var(--card2); color: var(--text); }
+
+        /* ===== رسالة فارغة ===== */
+        #empty-msg {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text3);
+            display: none;
+        }
+
+        /* ===== Toast إشعار ===== */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--card2);
+            color: var(--text);
+            padding: 12px 24px;
+            border-radius: 30px;
+            border: 1px solid var(--accent);
+            font-size: 14px;
+            transition: transform 0.3s;
+            z-index: 999;
+            text-align: center;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* ===== تكيّف مع الهاتف ===== */
+        @media (max-width: 600px) {
+            .toolbar { top: 64px; }
+            .card-title { font-size: 15px; }
+            .logo { font-size: 17px; }
+            main { padding: 10px 12px; }
+            #news-list.view-list .card-image-wrap {
+                width: 110px;
+                min-width: 110px;
+            }
+            #news-list.view-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ===== شريط إخباري للجديد ===== */
+        .ticker-wrap {
+            background: rgba(59,130,246,0.08);
+            border-bottom: 1px solid rgba(59,130,246,0.2);
+            overflow: hidden;
+            padding: 6px 0;
+        }
+        .ticker-label {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 2px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 12px;
+            border-radius: 4px;
+        }
+        .ticker-text {
+            display: inline;
+            font-size: 13px;
+            color: var(--text2);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-top">
+        <div class="logo">
+            📡 أخبار عالمية <span>مباشر</span>
+        </div>
+        <div style="flex:1"></div>
+        <div id="last-update" style="font-size:11px;color:var(--text3)"></div>
+    </div>
+    <div class="stats-bar">
+        <div class="stat">
+            <span class="dot"></span>
+            <span>مباشر</span>
+        </div>
+        <div class="stat">
+            <span>المقالات:</span>
+            <span class="stat-num" id="stat-total">...</span>
+        </div>
+        <div class="stat">
+            <span>آخر ساعة:</span>
+            <span class="stat-num" id="stat-hour">...</span>
+        </div>
+        <div class="stat">
+            <span>المصادر النشطة:</span>
+            <span class="stat-num" id="stat-sources">...</span>
+        </div>
+    </div>
+</header>
+
+<div class="ticker-wrap" id="ticker-wrap" style="display:none">
+    <div style="padding: 0 16px;">
+        <span class="ticker-label">جديد</span>
+        <span class="ticker-text" id="ticker-content"></span>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="ابحث في الأخبار..." oninput="onSearch()">
+    </div>
+    <select id="source-filter" onchange="onFilterChange()">
+        <option value="">جميع المصادر</option>
+    </select>
+    <div class="view-toggle">
+        <button class="view-btn active" id="btn-list" onclick="setView('list')" title="عرض قائمة">☰</button>
+        <button class="view-btn" id="btn-grid" onclick="setView('grid')" title="عرض شبكة">⊞</button>
+    </div>
+    <button class="btn-refresh" id="refresh-btn" onclick="manualRefresh()">
+        ⟳ تحديث
+    </button>
+</div>
+
+<main>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>جاري تحميل الأخبار...</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:8px">
+            قد يستغرق التحميل الأول بعض الدقائق أثناء الترجمة
+        </div>
+    </div>
+
+    <div id="empty-msg">
+        <div style="font-size:40px;margin-bottom:12px">📰</div>
+        <div>لا توجد أخبار بعد</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px">
+            الخادم يجلب الأخبار في الخلفية، انتظر قليلاً ثم اضغط تحديث
+        </div>
+    </div>
+
+    <div id="news-list" class="view-list"></div>
+
+    <div id="load-more-wrap" style="display:none">
+        <button class="btn-load-more" onclick="loadMore()">تحميل المزيد</button>
+    </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+    // ===== الحالة =====
+    let allNews = [];
+    let displayedCount = 0;
+    const PAGE_SIZE = 30;
+    let currentOffset = 0;
+    let totalArticles = 0;
+    let searchTimer = null;
+    let autoRefreshTimer = null;
+    let lastNewsIds = new Set();
+    let currentView = 'list';
+
+    // ===== مساعدات =====
+    function timeAgo(isoString) {
+        if (!isoString) return '';
+        const now = new Date();
+        const then = new Date(isoString);
+        const diff = Math.floor((now - then) / 1000);
+        if (diff < 60) return 'منذ ' + diff + ' ث';
+        if (diff < 3600) return 'منذ ' + Math.floor(diff/60) + ' د';
+        if (diff < 86400) return 'منذ ' + Math.floor(diff/3600) + ' س';
+        return 'منذ ' + Math.floor(diff/86400) + ' يوم';
+    }
+
+    function isNew(isoString) {
+        if (!isoString) return false;
+        const diff = (new Date() - new Date(isoString)) / 1000 / 60;
+        return diff < 30;
+    }
+
+    function langLabel(code) {
+        const map = {
+            en:'EN', fr:'FR', de:'DE', es:'ES', it:'IT', ja:'JA',
+            ko:'KO', nl:'NL', sv:'SV', da:'DA', fi:'FI', no:'NO',
+            pl:'PL', pt:'PT', ru:'RU', ar:'AR', cs:'CS', sk:'SK',
+            hu:'HU', zh:'ZH', he:'HE', tr:'TR', fa:'FA'
+        };
+        return map[code] || code.toUpperCase();
+    }
+
+    function showToast(msg, duration = 3000) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ===== تبديل العرض =====
+    function setView(mode) {
+        currentView = mode;
+        const list = document.getElementById('news-list');
+        list.className = mode === 'grid' ? 'view-grid' : 'view-list';
+        document.getElementById('btn-list').classList.toggle('active', mode === 'list');
+        document.getElementById('btn-grid').classList.toggle('active', mode === 'grid');
+        localStorage.setItem('newsView', mode);
+    }
+
+    // ===== إنشاء بطاقة خبر =====
+    function createCard(item) {
+        const card = document.createElement('div');
+        card.className = 'news-card' + (isNew(item.fetched_at) ? ' new-item' : '');
+        card.onclick = () => window.open(item.link, '_blank');
+
+        const isAr = item.original_lang === 'ar';
+        const showOrig = !isAr && item.original_title && item.original_title !== item.arabic_title;
+        const title = escapeHtml(item.arabic_title || item.original_title);
+        const origTitle = escapeHtml(item.original_title);
+        const summary = escapeHtml(item.summary_ar || item.summary || '');
+
+        // الصورة
+        let imageHtml = '';
+        if (item.image_url && item.image_url.startsWith('http')) {
+            imageHtml = `
+                <div class="card-image-wrap">
+                    <img src="${escapeHtml(item.image_url)}"
+                         alt="${title}"
+                         loading="lazy"
+                         onerror="this.parentElement.style.display='none'">
+                </div>`;
+        }
+
+        card.innerHTML = `
+            ${imageHtml}
+            <div class="card-body">
+                <div class="card-meta">
+                    <span class="source-badge">${escapeHtml(item.source_ar || item.source)}</span>
+                    ${item.country ? `<span class="country-badge">🌍 ${escapeHtml(item.country)}</span>` : ''}
+                    ${isNew(item.fetched_at) ? '<span class="new-badge">● جديد</span>' : ''}
+                    ${!isAr ? `<span class="lang-badge">${langLabel(item.original_lang)}</span>` : ''}
+                </div>
+                <div class="card-title">${title}</div>
+                ${showOrig ? `<div class="card-original">📝 ${origTitle}</div>` : ''}
+                ${summary ? `<div class="card-summary">${summary}</div>` : ''}
+                <div class="card-footer">
+                    <span class="card-time">${timeAgo(item.fetched_at)}</span>
+                    <a class="read-link" href="${escapeHtml(item.link)}" target="_blank" onclick="event.stopPropagation()">
+                        اقرأ الخبر كاملاً ←
+                    </a>
+                </div>
+            </div>
+        `;
+        return card;
+    }
+
+    // ===== تحميل الأخبار =====
+    async function loadNews(replace = true) {
+        const query = document.getElementById('search-input').value.trim();
+        const source = document.getElementById('source-filter').value;
+
+        const params = new URLSearchParams({
+            limit: PAGE_SIZE,
+            offset: replace ? 0 : currentOffset
+        });
+        if (query) params.append('q', query);
+        if (source) params.append('source', source);
+
+        try {
+            const res = await fetch('/api/news?' + params);
+            const data = await res.json();
+
+            if (replace) {
+                currentOffset = 0;
+                document.getElementById('news-list').innerHTML = '';
+            }
+
+            const list = document.getElementById('news-list');
+            const loading = document.getElementById('loading');
+            const emptyMsg = document.getElementById('empty-msg');
+
+            loading.style.display = 'none';
+
+            if (data.news.length === 0 && replace) {
+                emptyMsg.style.display = 'block';
+                document.getElementById('load-more-wrap').style.display = 'none';
+                return;
+            }
+
+            emptyMsg.style.display = 'none';
+
+            // تحقق من مقالات جديدة
+            let newCount = 0;
+            data.news.forEach(item => {
+                if (!lastNewsIds.has(item.id)) newCount++;
+                lastNewsIds.add(item.id);
+            });
+
+            if (!replace && newCount > 0) {
+                showToast(`${newCount} خبر جديد!`);
+                updateTicker(data.news.filter(n => isNew(n.fetched_at)));
+            }
+
+            data.news.forEach(item => list.appendChild(createCard(item)));
+
+            currentOffset += data.news.length;
+            totalArticles = data.total;
+
+            const loadMoreWrap = document.getElementById('load-more-wrap');
+            loadMoreWrap.style.display = currentOffset < totalArticles ? 'block' : 'none';
+
+            document.getElementById('last-update').textContent =
+                'آخر تحديث: ' + new Date().toLocaleTimeString('ar-SA');
+
+        } catch (err) {
+            document.getElementById('loading').style.display = 'none';
+            console.error('خطأ في تحميل الأخبار:', err);
+        }
+    }
+
+    function loadMore() { loadNews(false); }
+
+    // ===== تحميل الإحصائيات =====
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+            document.getElementById('stat-total').textContent = data.total_articles.toLocaleString('ar');
+            document.getElementById('stat-hour').textContent = data.last_hour.toLocaleString('ar');
+            document.getElementById('stat-sources').textContent = data.sources_active;
+        } catch(e) {}
+    }
+
+    // ===== تحميل المصادر للقائمة =====
+    async function loadSources() {
+        try {
+            const res = await fetch('/api/sources');
+            const sources = await res.json();
+            const sel = document.getElementById('source-filter');
+            sources
+                .filter(s => s.count > 0)
+                .sort((a, b) => b.count - a.count)
+                .forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.textContent = `${s.name_ar} (${s.count})`;
+                    sel.appendChild(opt);
+                });
+        } catch(e) {}
+    }
+
+    // ===== شريط الأخبار الجديدة =====
+    function updateTicker(newItems) {
+        if (!newItems || newItems.length === 0) return;
+        const wrap = document.getElementById('ticker-wrap');
+        const content = document.getElementById('ticker-content');
+        const titles = newItems.map(n => (n.arabic_title || n.original_title)).slice(0, 5);
+        content.textContent = ' ◆ ' + titles.join(' ◆ ');
+        wrap.style.display = 'block';
+        setTimeout(() => { wrap.style.display = 'none'; }, 30000);
+    }
+
+    // ===== أحداث البحث والتصفية =====
+    function onSearch() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadNews(true), 400);
+    }
+
+    function onFilterChange() { loadNews(true); }
+
+    // ===== تحديث يدوي =====
+    async function manualRefresh() {
+        const btn = document.getElementById('refresh-btn');
+        btn.disabled = true;
+        btn.textContent = '⟳ جاري...';
+        showToast('طلب تحديث أُرسل للخادم...');
+        try {
+            await fetch('/api/refresh', { method: 'POST' });
+            showToast('جاري جلب الأخبار في الخلفية، انتظر دقيقة...');
+        } catch(e) {
+            showToast('خطأ في إرسال طلب التحديث');
+        }
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = '⟳ تحديث';
+        }, 5000);
+        setTimeout(() => loadNews(true), 60000);
+    }
+
+    // ===== تحديث تلقائي كل دقيقتين =====
+    function startAutoRefresh() {
+        autoRefreshTimer = setInterval(async () => {
+            await loadStats();
+            const res = await fetch('/api/news?limit=10&offset=0');
+            const data = await res.json();
+            let hasNew = false;
+            data.news.forEach(item => { if (!lastNewsIds.has(item.id)) hasNew = true; });
+            if (hasNew) loadNews(true);
+        }, 120000);
+    }
+
+    // ===== تهيئة عند التحميل =====
+    document.addEventListener('DOMContentLoaded', async () => {
+        // استعادة نمط العرض المحفوظ
+        const savedView = localStorage.getItem('newsView') || 'list';
+        setView(savedView);
+
+        await loadStats();
+        await loadSources();
+        await loadNews(true);
+        startAutoRefresh();
+    });
+</script>
+</body>
+</html>
