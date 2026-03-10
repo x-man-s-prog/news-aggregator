@@ -274,7 +274,11 @@ def fetch_source(source):
                     break
 
             if not is_ar:
-                summary_ar = ''  # نترجم الملخص لاحقاً لتوفير الذاكرة
+                if summary:
+                    summary_ar = translate_to_arabic(summary[:200], src_lang)
+                    time.sleep(0.2)
+                else:
+                    summary_ar = ''
             else:
                 summary_ar = summary
 
