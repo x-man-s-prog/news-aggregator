@@ -27,9 +27,10 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 DB_PATH = 'news.db'
-FETCH_INTERVAL = 900   # كل 15 دقيقة
-ARTICLES_PER_SOURCE = 5  # عدد المقالات من كل مصدر (تقليل لتوفير ذاكرة)
-TRANSLATION_CACHE_LIMIT = 3000  # حد الكاش لتجنب تضخم الذاكرة
+FETCH_INTERVAL = 900        # كل 15 دقيقة
+ARTICLES_PER_SOURCE = 5     # عدد المقالات من كل مصدر
+TRANSLATION_CACHE_LIMIT = 3000  # حد الكاش
+NEWS_RETENTION_HOURS = 24   # احتفظ بالأخبار 24 ساعة فقط
 
 # ========== خريطة القارات والمناطق ==========
 CONTINENTS = {
@@ -343,15 +344,48 @@ def fetch_all_feeds():
     return total
 
 
+def cleanup_old_news():
+    """حذف الأخبار الأقدم من 24 ساعة - نافذة متحركة"""
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        # احسب عدد المقالات قبل الحذف
+        before = c.execute('SELECT COUNT(*) FROM news').fetchone()[0]
+        # احذف ما تجاوز 24 ساعة بناءً على وقت الجلب
+        c.execute(
+            "DELETE FROM news WHERE fetched_at < datetime('now', ? )",
+            (f'-{NEWS_RETENTION_HOURS} hours',)
+        )
+        deleted = before - c.execute('SELECT COUNT(*) FROM news').fetchone()[0]
+        conn.commit()
+        conn.close()
+        if deleted > 0:
+            log.info(f"🧹 حُذف {deleted} خبر قديم (أقدم من {NEWS_RETENTION_HOURS} ساعة) | متبقٍّ: {before - deleted}")
+        # تنظيف مساحة الديسك الفعلية
+        conn2 = get_db()
+        conn2.execute('VACUUM')
+        conn2.close()
+    except Exception as e:
+        log.warning(f"خطأ في تنظيف الأخبار: {e}")
+
+
 def background_worker():
     """خيط خلفي يجلب الأخبار بصورة دورية"""
     log.info("بدء الخيط الخلفي للأخبار...")
+    # تنظيف أولي عند البدء (في حالة وُجدت بيانات قديمة)
+    cleanup_old_news()
     # الجلب الأول فوراً
     fetch_all_feeds()
+    cleanup_old_news()  # تنظيف بعد الجلب الأول
+    cycle = 0
     while True:
         log.info(f"الانتظار {FETCH_INTERVAL // 60} دقائق قبل الجلب التالي...")
         time.sleep(FETCH_INTERVAL)
         fetch_all_feeds()
+        cycle += 1
+        # تنظيف بعد كل دورتين (كل 30 دقيقة)
+        if cycle % 2 == 0:
+            cleanup_old_news()
 
 
 # ========== مسارات Flask ==========
@@ -446,13 +480,22 @@ def get_stats():
     last_hour = conn.execute(
         "SELECT COUNT(*) FROM news WHERE fetched_at > datetime('now', '-1 hour')"
     ).fetchone()[0]
+    last_6h = conn.execute(
+        "SELECT COUNT(*) FROM news WHERE fetched_at > datetime('now', '-6 hours')"
+    ).fetchone()[0]
     sources_active = conn.execute('SELECT COUNT(DISTINCT source) FROM news').fetchone()[0]
+    oldest = conn.execute(
+        "SELECT MIN(fetched_at) FROM news"
+    ).fetchone()[0]
     conn.close()
 
     return jsonify({
         'total_articles': total,
         'last_hour': last_hour,
-        'sources_active': sources_active
+        'last_6h': last_6h,
+        'sources_active': sources_active,
+        'oldest_article': oldest,
+        'retention_hours': NEWS_RETENTION_HOURS
     })
 
 

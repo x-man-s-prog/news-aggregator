@@ -537,8 +537,16 @@
             <span class="stat-num" id="stat-hour">...</span>
         </div>
         <div class="stat">
+            <span>آخر 6 ساعات:</span>
+            <span class="stat-num" id="stat-6h">...</span>
+        </div>
+        <div class="stat">
             <span>المصادر النشطة:</span>
             <span class="stat-num" id="stat-sources">...</span>
+        </div>
+        <div class="stat" id="stat-window-wrap" title="الأخبار تُحفظ 24 ساعة ثم تُحذف تلقائياً">
+            <span>🕒</span>
+            <span id="stat-window" style="color:var(--text3);font-size:11px">نافذة ٢٤ س</span>
         </div>
     </div>
 </header>
@@ -785,7 +793,16 @@
             const data = await res.json();
             document.getElementById('stat-total').textContent = data.total_articles.toLocaleString('ar');
             document.getElementById('stat-hour').textContent = data.last_hour.toLocaleString('ar');
+            document.getElementById('stat-6h').textContent = (data.last_6h || 0).toLocaleString('ar');
             document.getElementById('stat-sources').textContent = data.sources_active;
+
+            // عمر أقدم خبر
+            if (data.oldest_article) {
+                const diff = Math.floor((new Date() - new Date(data.oldest_article)) / 3600000);
+                const hours = Math.min(diff, data.retention_hours || 24);
+                document.getElementById('stat-window').textContent =
+                    `🕒 آخر ${hours} س`;
+            }
         } catch(e) {}
     }
 
