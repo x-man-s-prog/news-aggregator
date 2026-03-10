@@ -140,7 +140,7 @@ def translate_to_arabic(text, source_lang='auto'):
 
     try:
         translator = GoogleTranslator(source=source_lang, target='ar')
-        result = translator.translate(text[:400])  # حد 400 حرف
+        result = translator.translate(text[:600])  # حد 600 حرف
         if result:
             # تنظيف الكاش إذا تجاوز الحد
             if len(_translation_cache) >= TRANSLATION_CACHE_LIMIT:
@@ -270,12 +270,12 @@ def fetch_source(source):
                 if isinstance(val, list):
                     val = val[0].get('value','') if val else ''
                 if val:
-                    summary = re.sub(r'<[^>]+>', '', val)[:300]
+                    summary = re.sub(r'<[^>]+>', '', val)[:600]
                     break
 
             if not is_ar:
                 if summary:
-                    summary_ar = translate_to_arabic(summary[:200], src_lang)
+                    summary_ar = translate_to_arabic(summary[:500], src_lang)
                     time.sleep(0.2)
                 else:
                     summary_ar = ''
