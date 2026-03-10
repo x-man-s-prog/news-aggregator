@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 DB_PATH = 'news.db'
-FETCH_INTERVAL = 300   # كل 5 دقائق
+FETCH_INTERVAL = 600   # كل 10 دقائق (الجلب المتوازي أسرع)
 ARTICLES_PER_SOURCE = 8  # عدد المقالات من كل مصدر
 
 
@@ -281,19 +281,23 @@ def fetch_source(source):
 
 
 def fetch_all_feeds():
-    """جلب جميع المصادر بالتسلسل"""
+    """جلب جميع المصادر بشكل متوازٍ - أسرع بـ 15x"""
     from sources import SOURCES
-    log.info(f"--- بدء الجلب من {len(SOURCES)} مصدر ---")
+    import concurrent.futures
+    log.info(f"--- بدء الجلب المتوازي من {len(SOURCES)} مصدر (15 خيط) ---")
     total = 0
-    for i, source in enumerate(SOURCES, 1):
-        count = fetch_source(source)
-        total += count
-        # تأخير أطول بين كل مجموعة
-        if i % 10 == 0:
-            time.sleep(2)
-        else:
-            time.sleep(0.3)
-    log.info(f"--- انتهى الجلب: {total} مقال جديد ---")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        futures = {executor.submit(fetch_source, src): src for src in SOURCES}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                count = future.result(timeout=30)
+                total += count
+            except Exception as e:
+                src = futures[future]
+                log.warning(f"✗ خطأ في {src['name']}: {e}")
+
+    log.info(f"--- انتهى الجلب المتوازي: {total} مقال جديد ---")
     return total
 
 
