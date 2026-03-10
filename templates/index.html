@@ -550,13 +550,7 @@
 </div>
 
 <div class="regions-bar" id="regions-bar">
-    <div class="regions-section-label">المنطقة الجغرافية</div>
     <div class="regions-row" id="regions-continents">
-        <!-- تُملأ بـ JavaScript -->
-    </div>
-    <div class="regions-divider"></div>
-    <div class="regions-section-label">نوع المصدر</div>
-    <div class="regions-row" id="regions-types">
         <!-- تُملأ بـ JavaScript -->
     </div>
 </div>
@@ -566,6 +560,9 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="search-input" placeholder="ابحث في الأخبار..." oninput="onSearch()">
     </div>
+    <select id="type-filter" onchange="onFilterChange()">
+        <option value="">🗂️ جميع الأنواع</option>
+    </select>
     <select id="source-filter" onchange="onFilterChange()">
         <option value="">جميع المصادر</option>
     </select>
@@ -616,7 +613,6 @@
     let lastNewsIds = new Set();
     let currentView = 'list';
     let currentContinent = '';
-    let currentSourceType = '';
 
     // ===== مساعدات =====
     function timeAgo(isoString) {
@@ -727,7 +723,8 @@
         if (query) params.append('q', query);
         if (source) params.append('source', source);
         if (currentContinent) params.append('continent', currentContinent);
-        if (currentSourceType) params.append('type', currentSourceType);
+        const typeFilter = document.getElementById('type-filter')?.value || '';
+        if (typeFilter) params.append('type', typeFilter);
 
         try {
             const res = await fetch('/api/news?' + params);
@@ -827,58 +824,42 @@
     }
 
     async function loadRegionsBar() {
-        const contRow  = document.getElementById('regions-continents');
-        const typeRow  = document.getElementById('regions-types');
+        const contRow = document.getElementById('regions-continents');
         contRow.innerHTML = '';
-        typeRow.innerHTML = '';
-
-        // زر "الكل" في صف القارات
-        contRow.appendChild(buildRegionBtn('all-regions', '🌐', 'الكل', 0, () => setRegionFilter('', '')));
-
+        // زر "الكل"
+        contRow.appendChild(buildRegionBtn('all-regions', '🌐', 'الكل', 0, () => setRegionFilter('')));
         // القارات
         try {
             const conts = await fetch('/api/continents').then(r => r.json());
             conts.forEach(c => {
                 const icon = REGION_ICONS[c.name] || '🌐';
-                const btn = buildRegionBtn('cont-' + c.name, icon, c.name, c.count,
-                    () => setRegionFilter(c.name, ''));
-                contRow.appendChild(btn);
-            });
-        } catch(e) {}
-
-        // أنواع المصادر
-        try {
-            const types = await fetch('/api/source-types').then(r => r.json());
-            // زر "الكل" في صف الأنواع
-            const allTypesBtn = buildRegionBtn('all-types', '📋', 'الكل', 0, () => setRegionFilter('', ''));
-            typeRow.appendChild(allTypesBtn);
-            types.forEach(t => {
-                const icon = TYPE_ICONS[t.type] || '📄';
-                const btn = buildRegionBtn('type-' + t.type, icon, t.type, t.count,
-                    () => setRegionFilter('', t.type));
-                typeRow.appendChild(btn);
+                contRow.appendChild(
+                    buildRegionBtn('cont-' + c.name, icon, c.name, c.count, () => setRegionFilter(c.name))
+                );
             });
         } catch(e) {}
     }
 
-    function setRegionFilter(continent, sourceType) {
+    // تحميل أنواع المصادر في الـ dropdown
+    async function loadTypeFilter() {
+        try {
+            const types = await fetch('/api/source-types').then(r => r.json());
+            const sel = document.getElementById('type-filter');
+            types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.type;
+                const icon = TYPE_ICONS[t.type] || '📄';
+                opt.textContent = `${icon} ${t.type}  (${t.count.toLocaleString('ar-SA')})`;
+                sel.appendChild(opt);
+            });
+        } catch(e) {}
+    }
+
+    function setRegionFilter(continent) {
         currentContinent = continent;
-        currentSourceType = sourceType;
-
-        // إزالة التفعيل من جميع الأزرار
         document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
-
-        if (!continent && !sourceType) {
-            // الكل محدد: فعّل "الكل" في الصفين
-            document.getElementById('all-regions')?.classList.add('active');
-            document.getElementById('all-types')?.classList.add('active');
-        } else if (continent) {
-            document.getElementById('cont-' + continent)?.classList.add('active');
-            document.getElementById('all-types')?.classList.add('active');
-        } else if (sourceType) {
-            document.getElementById('all-regions')?.classList.add('active');
-            document.getElementById('type-' + sourceType)?.classList.add('active');
-        }
+        const activeId = continent ? 'cont-' + continent : 'all-regions';
+        document.getElementById(activeId)?.classList.add('active');
         loadNews(true);
     }
 
@@ -956,9 +937,8 @@
         const savedView = localStorage.getItem('newsView') || 'list';
         setView(savedView);
 
-        await loadStats();
-        await loadSources();
-        await loadRegionsBar();
+        // تحميل متوازٍ لكل الإحصائيات والفلاتر دفعةً واحدة
+        await Promise.all([loadStats(), loadSources(), loadRegionsBar(), loadTypeFilter()]);
         await loadNews(true);
         startAutoRefresh();
     });

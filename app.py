@@ -108,8 +108,12 @@ def init_db():
             c.execute(col_def)
         except Exception:
             pass
-    c.execute('CREATE INDEX IF NOT EXISTS idx_fetched ON news(fetched_at DESC)')
-    c.execute('CREATE INDEX IF NOT EXISTS idx_source ON news(source)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_fetched  ON news(fetched_at DESC)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_source   ON news(source)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_country  ON news(country)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_type     ON news(source_type)')
+    # فهرس مركّب لأسرع فلترة بالبلد+الوقت
+    c.execute('CREATE INDEX IF NOT EXISTS idx_country_fetched ON news(country, fetched_at DESC)')
     conn.commit()
     conn.close()
     log.info("قاعدة البيانات جاهزة.")
