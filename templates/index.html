@@ -418,35 +418,34 @@
 
         /* ===== شريط القارات ===== */
         .regions-bar {
-            position: sticky;
-            top: 90px;
-            z-index: 98;
             background: rgba(15,23,42,0.97);
-            backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
-            padding: 0 16px;
-            overflow-x: auto;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
+            padding: 8px 16px 10px;
         }
-        .regions-bar::-webkit-scrollbar { display: none; }
-        .regions-scroll {
+        .regions-section-label {
+            font-size: 10px;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 5px;
+            margin-top: 4px;
+        }
+        .regions-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 6px;
-            padding: 8px 0;
-            min-width: max-content;
             align-items: center;
         }
         .region-btn {
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 20px;
             border: 1px solid var(--border);
             background: transparent;
             color: var(--text2);
-            font-size: 13px;
+            font-size: 12px;
             cursor: pointer;
             white-space: nowrap;
             transition: all 0.2s;
@@ -467,26 +466,18 @@
         .region-count {
             background: rgba(255,255,255,0.15);
             border-radius: 10px;
-            padding: 1px 7px;
-            font-size: 11px;
+            padding: 1px 6px;
+            font-size: 10px;
             font-weight: 600;
         }
         .region-btn.active .region-count {
             background: rgba(255,255,255,0.25);
         }
-        /* فاصل بين القارات والأنواع */
         .regions-divider {
-            width: 1px;
-            height: 24px;
+            width: 100%;
+            height: 1px;
             background: var(--border);
-            margin: 0 4px;
-            flex-shrink: 0;
-        }
-        /* تعديل موضع شريط الأدوات */
-        .toolbar { top: 133px; }
-        @media (max-width: 600px) {
-            .regions-bar { top: 64px; }
-            .toolbar { top: 110px; }
+            margin: 6px 0;
         }
 
         /* ===== شريط إخباري للجديد ===== */
@@ -559,7 +550,13 @@
 </div>
 
 <div class="regions-bar" id="regions-bar">
-    <div class="regions-scroll" id="regions-scroll">
+    <div class="regions-section-label">المنطقة الجغرافية</div>
+    <div class="regions-row" id="regions-continents">
+        <!-- تُملأ بـ JavaScript -->
+    </div>
+    <div class="regions-divider"></div>
+    <div class="regions-section-label">نوع المصدر</div>
+    <div class="regions-row" id="regions-types">
         <!-- تُملأ بـ JavaScript -->
     </div>
 </div>
@@ -830,16 +827,13 @@
     }
 
     async function loadRegionsBar() {
-        const scroll = document.getElementById('regions-scroll');
-        scroll.innerHTML = '';
+        const contRow  = document.getElementById('regions-continents');
+        const typeRow  = document.getElementById('regions-types');
+        contRow.innerHTML = '';
+        typeRow.innerHTML = '';
 
-        // زر "الكل"
-        scroll.appendChild(buildRegionBtn('all-regions', '🌐', 'الكل', 0, () => setRegionFilter('', '')));
-
-        // فاصل
-        const div1 = document.createElement('div');
-        div1.className = 'regions-divider';
-        scroll.appendChild(div1);
+        // زر "الكل" في صف القارات
+        contRow.appendChild(buildRegionBtn('all-regions', '🌐', 'الكل', 0, () => setRegionFilter('', '')));
 
         // القارات
         try {
@@ -848,23 +842,21 @@
                 const icon = REGION_ICONS[c.name] || '🌐';
                 const btn = buildRegionBtn('cont-' + c.name, icon, c.name, c.count,
                     () => setRegionFilter(c.name, ''));
-                scroll.appendChild(btn);
+                contRow.appendChild(btn);
             });
         } catch(e) {}
-
-        // فاصل
-        const div2 = document.createElement('div');
-        div2.className = 'regions-divider';
-        scroll.appendChild(div2);
 
         // أنواع المصادر
         try {
             const types = await fetch('/api/source-types').then(r => r.json());
-            types.slice(0, 8).forEach(t => {
+            // زر "الكل" في صف الأنواع
+            const allTypesBtn = buildRegionBtn('all-types', '📋', 'الكل', 0, () => setRegionFilter('', ''));
+            typeRow.appendChild(allTypesBtn);
+            types.forEach(t => {
                 const icon = TYPE_ICONS[t.type] || '📄';
                 const btn = buildRegionBtn('type-' + t.type, icon, t.type, t.count,
                     () => setRegionFilter('', t.type));
-                scroll.appendChild(btn);
+                typeRow.appendChild(btn);
             });
         } catch(e) {}
     }
@@ -873,13 +865,18 @@
         currentContinent = continent;
         currentSourceType = sourceType;
 
-        // تحديث الأزرار
+        // إزالة التفعيل من جميع الأزرار
         document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+
         if (!continent && !sourceType) {
+            // الكل محدد: فعّل "الكل" في الصفين
             document.getElementById('all-regions')?.classList.add('active');
+            document.getElementById('all-types')?.classList.add('active');
         } else if (continent) {
             document.getElementById('cont-' + continent)?.classList.add('active');
+            document.getElementById('all-types')?.classList.add('active');
         } else if (sourceType) {
+            document.getElementById('all-regions')?.classList.add('active');
             document.getElementById('type-' + sourceType)?.classList.add('active');
         }
         loadNews(true);
