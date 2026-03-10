@@ -411,6 +411,97 @@ def manual_refresh():
     return jsonify({'status': 'جاري التحديث...', 'message': 'بدأ التحديث اليدوي'})
 
 
+@app.route('/api/fetch-status')
+def fetch_status():
+    """تفاصيل حالة كل مصدر"""
+    from sources import SOURCES
+    conn = get_db()
+    rows = conn.execute('SELECT source, COUNT(*) as cnt FROM news GROUP BY source').fetchall()
+    conn.close()
+
+    counts = {r['source']: r['cnt'] for r in rows}
+    active   = [s for s in SOURCES if counts.get(s['name'], 0) > 0]
+    inactive = [s for s in SOURCES if counts.get(s['name'], 0) == 0]
+
+    return jsonify({
+        'total_sources': len(SOURCES),
+        'active_sources': len(active),
+        'inactive_sources': len(inactive),
+        'coverage_pct': round(len(active) / len(SOURCES) * 100, 1),
+        'active': [{'name': s['name'], 'name_ar': s.get('name_ar',''), 'country': s.get('country',''), 'articles': counts[s['name']]} for s in active],
+        'inactive': [{'name': s['name'], 'name_ar': s.get('name_ar',''), 'country': s.get('country',''), 'url': s.get('url','')} for s in inactive],
+    })
+
+
+@app.route('/status')
+def status_page():
+    """صفحة مراقبة المصادر"""
+    return '''<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="15">
+<title>حالة المصادر</title>
+<style>
+  body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+  h1{color:#38bdf8;text-align:center}
+  .stats{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:20px 0}
+  .card{background:#1e293b;border-radius:12px;padding:20px 32px;text-align:center;min-width:140px}
+  .card .num{font-size:2.5rem;font-weight:bold;color:#38bdf8}
+  .card .lbl{color:#94a3b8;font-size:.9rem;margin-top:4px}
+  .progress{background:#1e293b;border-radius:8px;overflow:hidden;height:28px;margin:16px auto;max-width:600px}
+  .bar{height:100%;background:linear-gradient(90deg,#0ea5e9,#38bdf8);transition:width .5s;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:.9rem}
+  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:.85rem}
+  th{background:#1e293b;padding:10px;color:#94a3b8;font-weight:normal}
+  td{padding:8px 10px;border-bottom:1px solid #1e293b}
+  .active{color:#4ade80} .inactive{color:#f87171}
+  .tabs{display:flex;gap:8px;margin:20px 0;justify-content:center}
+  .tab{padding:8px 24px;border-radius:8px;cursor:pointer;border:1px solid #334155;background:#1e293b;color:#94a3b8}
+  .tab.on{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+  #activeT,#inactiveT{display:none}
+  .refresh{font-size:.8rem;color:#475569;text-align:center;margin-top:8px}
+</style>
+</head>
+<body>
+<h1>📡 حالة المصادر</h1>
+<div class="stats" id="stats">جاري التحميل...</div>
+<div class="progress"><div class="bar" id="bar" style="width:0%">0%</div></div>
+<div class="tabs">
+  <div class="tab on" onclick="show('active')">✅ نشطة</div>
+  <div class="tab" onclick="show('inactive')">❌ غير نشطة</div>
+</div>
+<div id="activeT"><table><thead><tr><th>#</th><th>المصدر</th><th>الدولة</th><th>المقالات</th></tr></thead><tbody id="activeTb"></tbody></table></div>
+<div id="inactiveT"><table><thead><tr><th>#</th><th>المصدر</th><th>الدولة</th><th>الرابط</th></tr></thead><tbody id="inactiveTb"></tbody></table></div>
+<div class="refresh">🔄 يتجدد تلقائياً كل 15 ثانية</div>
+<script>
+let cur='active';
+function show(t){
+  cur=t;
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',['active','inactive'][i]===t));
+  document.getElementById('activeT').style.display=t==='active'?'block':'none';
+  document.getElementById('inactiveT').style.display=t==='inactive'?'block':'none';
+}
+async function load(){
+  const d=await fetch('/api/fetch-status').then(r=>r.json());
+  document.getElementById('stats').innerHTML=`
+    <div class="card"><div class="num">${d.total_sources}</div><div class="lbl">إجمالي المصادر</div></div>
+    <div class="card"><div class="num" style="color:#4ade80">${d.active_sources}</div><div class="lbl">نشطة ✅</div></div>
+    <div class="card"><div class="num" style="color:#f87171">${d.inactive_sources}</div><div class="lbl">غير نشطة ❌</div></div>
+    <div class="card"><div class="num" style="color:#fbbf24">${d.coverage_pct}%</div><div class="lbl">نسبة التغطية</div></div>`;
+  document.getElementById('bar').style.width=d.coverage_pct+'%';
+  document.getElementById('bar').textContent=d.coverage_pct+'%';
+  document.getElementById('activeTb').innerHTML=d.active.map((s,i)=>
+    `<tr><td>${i+1}</td><td><b>${s.name_ar}</b><br><small style="color:#64748b">${s.name}</small></td><td>${s.country}</td><td class="active">${s.articles}</td></tr>`).join('');
+  document.getElementById('inactiveTb').innerHTML=d.inactive.map((s,i)=>
+    `<tr><td>${i+1}</td><td><b>${s.name_ar}</b><br><small style="color:#64748b">${s.name}</small></td><td>${s.country}</td><td><small style="color:#475569;word-break:break-all">${s.url}</small></td></tr>`).join('');
+  show(cur);
+}
+load();
+</script>
+</body>
+</html>'''
+
+
 # ========== تشغيل تلقائي عند الاستيراد (للخوادم) ==========
 
 init_db()
