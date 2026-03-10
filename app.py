@@ -27,8 +27,9 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 DB_PATH = 'news.db'
-FETCH_INTERVAL = 600   # كل 10 دقائق (الجلب المتوازي أسرع)
-ARTICLES_PER_SOURCE = 8  # عدد المقالات من كل مصدر
+FETCH_INTERVAL = 900   # كل 15 دقيقة
+ARTICLES_PER_SOURCE = 5  # عدد المقالات من كل مصدر (تقليل لتوفير ذاكرة)
+TRANSLATION_CACHE_LIMIT = 3000  # حد الكاش لتجنب تضخم الذاكرة
 
 # ========== خريطة القارات والمناطق ==========
 CONTINENTS = {
@@ -124,7 +125,7 @@ def get_db():
 _translation_cache = {}
 
 def translate_to_arabic(text, source_lang='auto'):
-    """ترجمة النص إلى العربية مع تخزين مؤقت"""
+    """ترجمة النص إلى العربية مع تخزين مؤقت محدود الحجم"""
     if not text or not text.strip():
         return text
 
@@ -132,21 +133,16 @@ def translate_to_arabic(text, source_lang='auto'):
     if cache_key in _translation_cache:
         return _translation_cache[cache_key]
 
-    # تحقق من قاعدة البيانات
-    conn = get_db()
-    row = conn.execute(
-        'SELECT arabic_title FROM news WHERE original_title = ? AND arabic_title IS NOT NULL LIMIT 1',
-        (text,)
-    ).fetchone()
-    conn.close()
-    if row:
-        _translation_cache[cache_key] = row['arabic_title']
-        return row['arabic_title']
-
     try:
         translator = GoogleTranslator(source=source_lang, target='ar')
-        result = translator.translate(text[:500])  # حد 500 حرف
+        result = translator.translate(text[:400])  # حد 400 حرف
         if result:
+            # تنظيف الكاش إذا تجاوز الحد
+            if len(_translation_cache) >= TRANSLATION_CACHE_LIMIT:
+                # حذف ربع الكاش القديم
+                keys_to_delete = list(_translation_cache.keys())[:TRANSLATION_CACHE_LIMIT // 4]
+                for k in keys_to_delete:
+                    del _translation_cache[k]
             _translation_cache[cache_key] = result
             return result
     except Exception as e:
@@ -217,18 +213,19 @@ def fetch_source(source):
 
     try:
         import requests as _req
+        import re, gc
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+            'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)',
+            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
             'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
         }
-        resp = _req.get(url, headers=headers, timeout=15)
+        resp = _req.get(url, headers=headers, timeout=12, stream=False)
         if resp.status_code != 200:
             log.debug(f"HTTP {resp.status_code}: {source['name']}")
             return 0
+
         feed = feedparser.parse(resp.content)
+        del resp  # تحرير الذاكرة فوراً
 
         if not feed.entries:
             log.debug(f"لا توجد مقالات: {source['name']}")
@@ -237,6 +234,8 @@ def fetch_source(source):
         conn = get_db()
         c = conn.cursor()
         new_count = 0
+        is_ar = is_arabic_source(source.get('lang', 'en'))
+        src_lang = source.get('lang', 'auto')
 
         for entry in feed.entries[:ARTICLES_PER_SOURCE]:
             link = entry.get('link', '').strip()
@@ -252,36 +251,30 @@ def fetch_source(source):
                 continue
 
             # الترجمة
-            if is_arabic_source(source.get('lang', 'en')):
+            if is_ar:
                 arabic_title = title
+                summary_ar = ''
             else:
-                arabic_title = translate_to_arabic(title, source.get('lang', 'auto'))
-                time.sleep(0.4)  # تأخير بسيط لتجنب الحظر
+                arabic_title = translate_to_arabic(title, src_lang)
+                time.sleep(0.3)
 
-            # ملخص قصير
-            import re
+            # ملخص قصير (بدون ترجمة لتوفير الذاكرة والوقت)
             summary = ''
             for field in ['summary', 'description']:
                 val = entry.get(field, '')
                 if isinstance(val, list):
                     val = val[0].get('value','') if val else ''
                 if val:
-                    summary = re.sub(r'<[^>]+>', '', val)[:500]
+                    summary = re.sub(r'<[^>]+>', '', val)[:300]
                     break
 
-            # ترجمة الملخص
-            if summary:
-                if is_arabic_source(source.get('lang', 'en')):
-                    summary_ar = summary
-                else:
-                    summary_ar = translate_to_arabic(summary, source.get('lang', 'auto'))
-                    time.sleep(0.4)
+            if not is_ar:
+                summary_ar = ''  # نترجم الملخص لاحقاً لتوفير الذاكرة
             else:
-                summary_ar = ''
+                summary_ar = summary
 
             # استخراج الصورة
             image_url = get_entry_image(entry)
-
             published = parse_date(entry)
 
             c.execute('''
@@ -311,6 +304,8 @@ def fetch_source(source):
 
         conn.commit()
         conn.close()
+        del feed  # تحرير الذاكرة
+        gc.collect()
 
         if new_count > 0:
             log.info(f"✓ {source['name']}: {new_count} مقال جديد")
@@ -322,21 +317,27 @@ def fetch_source(source):
 
 
 def fetch_all_feeds():
-    """جلب جميع المصادر بشكل متوازٍ - أسرع بـ 15x"""
+    """جلب جميع المصادر بشكل متوازٍ - 6 خيوط لتوازن بين السرعة والذاكرة"""
     from sources import SOURCES
-    import concurrent.futures
-    log.info(f"--- بدء الجلب المتوازي من {len(SOURCES)} مصدر (15 خيط) ---")
+    import concurrent.futures, gc
+    log.info(f"--- بدء الجلب المتوازي من {len(SOURCES)} مصدر (6 خيوط) ---")
     total = 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-        futures = {executor.submit(fetch_source, src): src for src in SOURCES}
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                count = future.result(timeout=30)
-                total += count
-            except Exception as e:
-                src = futures[future]
-                log.warning(f"✗ خطأ في {src['name']}: {e}")
+    # نجلب على دفعات لتجنب تراكم الذاكرة
+    batch_size = 100
+    for i in range(0, len(SOURCES), batch_size):
+        batch = SOURCES[i:i + batch_size]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {executor.submit(fetch_source, src): src for src in batch}
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    count = future.result(timeout=35)
+                    total += count
+                except Exception as e:
+                    src = futures[future]
+                    log.warning(f"✗ خطأ في {src['name']}: {e}")
+        gc.collect()  # تنظيف الذاكرة بين الدفعات
+        log.info(f"  دفعة {i//batch_size + 1}: أُنجزت ({min(i+batch_size, len(SOURCES))}/{len(SOURCES)})")
 
     log.info(f"--- انتهى الجلب المتوازي: {total} مقال جديد ---")
     return total
