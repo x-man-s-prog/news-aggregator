@@ -30,6 +30,47 @@ DB_PATH = 'news.db'
 FETCH_INTERVAL = 600   # كل 10 دقائق (الجلب المتوازي أسرع)
 ARTICLES_PER_SOURCE = 8  # عدد المقالات من كل مصدر
 
+# ========== خريطة القارات والمناطق ==========
+CONTINENTS = {
+    'الشرق الأوسط': [
+        'السعودية','الإمارات','قطر','الكويت','البحرين','عُمان',
+        'اليمن','العراق','سوريا','لبنان','الأردن','فلسطين',
+        'مصر','ليبيا','تونس','الجزائر','المغرب','السودان',
+        'إيران','تركيا','إسرائيل','أفغانستان',
+    ],
+    'أوروبا': [
+        'بريطانيا','فرنسا','ألمانيا','إيطاليا','إسبانيا','البرتغال',
+        'هولندا','بلجيكا','سويسرا','النرويج','السويد','الدنمارك',
+        'فنلندا','أيرلندا','أوكرانيا','بولندا','التشيك','تشيك',
+        'سلوفاكيا','المجر','رومانيا','بلغاريا','صربيا','كرواتيا',
+        'إستونيا','ليتوانيا','لاتفيا','اليونان','روسيا','بيلاروسيا',
+        'أوروبا',
+    ],
+    'أمريكا الشمالية': ['أمريكا','كندا','المكسيك'],
+    'أمريكا اللاتينية': [
+        'البرازيل','الأرجنتين','تشيلي','كولومبيا','بيرو','بوليفيا',
+        'الإكوادور','فنزويلا','أوروغواي','الأوروغواي','باراغواي',
+        'غواتيمالا','السلفادور','بنما','الدومينيكان',
+    ],
+    'آسيا': [
+        'الهند','باكستان','بنغلاديش','سريلانكا','نيبال','المالديف','بوتان',
+        'اليابان','كوريا الجنوبية','الصين','تايوان','هونغ كونغ',
+        'سنغافورة','ماليزيا','إندونيسيا','الفلبين','تايلاند',
+        'فيتنام','ميانمار','كمبوديا','لاوس','بروناي',
+        'قيرغيزستان','كازاخستان','أوزبكستان','طاجيكستان',
+        'أذربيجان','جورجيا','أرمينيا','روما',
+    ],
+    'أفريقيا': [
+        'نيجيريا','كينيا','جنوب أفريقيا','إثيوبيا','غانا','تنزانيا',
+        'أوغندا','الكاميرون','السنغال','زيمبابوي','زامبيا','بوتسوانا',
+        'ناميبيا','ملاوي','مدغشقر','الصومال','ساحل العاج',
+        'بوركينا فاسو','أفريقيا',
+    ],
+    'أوقيانوسيا': [
+        'أستراليا','نيوزيلندا','فيجي','ساموا','بابوا نيو غينيا','أوقيانوسيا',
+    ],
+}
+
 
 # ========== قاعدة البيانات ==========
 
@@ -323,8 +364,10 @@ def index():
 def get_news():
     limit = min(request.args.get('limit', 100, type=int), 500)
     offset = request.args.get('offset', 0, type=int)
-    source_filter = request.args.get('source', '').strip()
-    search = request.args.get('q', '').strip()
+    source_filter  = request.args.get('source', '').strip()
+    search         = request.args.get('q', '').strip()
+    continent      = request.args.get('continent', '').strip()
+    source_type    = request.args.get('type', '').strip()
 
     conn = get_db()
 
@@ -338,6 +381,15 @@ def get_news():
     if search:
         where_clauses.append('(arabic_title LIKE ? OR original_title LIKE ?)')
         params.extend([f'%{search}%', f'%{search}%'])
+
+    if continent and continent in CONTINENTS:
+        countries = CONTINENTS[continent]
+        where_clauses.append('country IN (' + ','.join(['?']*len(countries)) + ')')
+        params.extend(countries)
+
+    if source_type:
+        where_clauses.append('source_type = ?')
+        params.append(source_type)
 
     where_sql = ''
     if where_clauses:
@@ -409,6 +461,32 @@ def manual_refresh():
     t = threading.Thread(target=fetch_all_feeds, daemon=True)
     t.start()
     return jsonify({'status': 'جاري التحديث...', 'message': 'بدأ التحديث اليدوي'})
+
+
+@app.route('/api/continents')
+def get_continents():
+    """عدد الأخبار لكل قارة/منطقة"""
+    conn = get_db()
+    rows = conn.execute('SELECT country, COUNT(*) as cnt FROM news GROUP BY country').fetchall()
+    conn.close()
+    country_counts = {r['country']: r['cnt'] for r in rows}
+
+    result = []
+    for name, countries in CONTINENTS.items():
+        total = sum(country_counts.get(c, 0) for c in countries)
+        result.append({'name': name, 'count': total})
+    return jsonify(result)
+
+
+@app.route('/api/source-types')
+def get_source_types():
+    """أنواع المصادر المتاحة مع عدد أخبار كل نوع"""
+    conn = get_db()
+    rows = conn.execute(
+        'SELECT source_type, COUNT(*) as cnt FROM news WHERE source_type != "" GROUP BY source_type ORDER BY cnt DESC'
+    ).fetchall()
+    conn.close()
+    return jsonify([{'type': r['source_type'], 'count': r['cnt']} for r in rows])
 
 
 @app.route('/api/fetch-status')

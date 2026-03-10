@@ -416,6 +416,79 @@
             }
         }
 
+        /* ===== شريط القارات ===== */
+        .regions-bar {
+            position: sticky;
+            top: 90px;
+            z-index: 98;
+            background: rgba(15,23,42,0.97);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .regions-bar::-webkit-scrollbar { display: none; }
+        .regions-scroll {
+            display: flex;
+            gap: 6px;
+            padding: 8px 0;
+            min-width: max-content;
+            align-items: center;
+        }
+        .region-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text2);
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-family: inherit;
+        }
+        .region-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent2);
+            background: rgba(59,130,246,0.08);
+        }
+        .region-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+            font-weight: 700;
+        }
+        .region-count {
+            background: rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 1px 7px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .region-btn.active .region-count {
+            background: rgba(255,255,255,0.25);
+        }
+        /* فاصل بين القارات والأنواع */
+        .regions-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+            margin: 0 4px;
+            flex-shrink: 0;
+        }
+        /* تعديل موضع شريط الأدوات */
+        .toolbar { top: 133px; }
+        @media (max-width: 600px) {
+            .regions-bar { top: 64px; }
+            .toolbar { top: 110px; }
+        }
+
         /* ===== شريط إخباري للجديد ===== */
         .ticker-wrap {
             background: rgba(59,130,246,0.08);
@@ -477,6 +550,12 @@
     </div>
 </div>
 
+<div class="regions-bar" id="regions-bar">
+    <div class="regions-scroll" id="regions-scroll">
+        <!-- تُملأ بـ JavaScript -->
+    </div>
+</div>
+
 <div class="toolbar">
     <div class="search-wrap">
         <span class="search-icon">🔍</span>
@@ -531,6 +610,8 @@
     let autoRefreshTimer = null;
     let lastNewsIds = new Set();
     let currentView = 'list';
+    let currentContinent = '';
+    let currentSourceType = '';
 
     // ===== مساعدات =====
     function timeAgo(isoString) {
@@ -640,6 +721,8 @@
         });
         if (query) params.append('q', query);
         if (source) params.append('source', source);
+        if (currentContinent) params.append('continent', currentContinent);
+        if (currentSourceType) params.append('type', currentSourceType);
 
         try {
             const res = await fetch('/api/news?' + params);
@@ -704,6 +787,85 @@
             document.getElementById('stat-hour').textContent = data.last_hour.toLocaleString('ar');
             document.getElementById('stat-sources').textContent = data.sources_active;
         } catch(e) {}
+    }
+
+    // ===== شريط القارات والأنواع =====
+    const REGION_ICONS = {
+        'الشرق الأوسط': '🌙', 'أوروبا': '🏛️',
+        'أمريكا الشمالية': '🗽', 'أمريكا اللاتينية': '🌎',
+        'آسيا': '🏯', 'أفريقيا': '🌍', 'أوقيانوسيا': '🦘',
+    };
+    const TYPE_ICONS = {
+        'صحيفة': '📰', 'تلفزيون': '📺', 'وكالة أنباء': '📡',
+        'رقمي': '💻', 'مجلة': '📖', 'راديو': '📻',
+        'استقصائي': '🔍', 'مالي': '💰', 'علمي': '🔬',
+        'رياضة': '⚽', 'تقنية': '🖥️', 'بيئي': '🌱',
+        'سياسي': '🏛', 'حقوقي': '⚖️',
+    };
+
+    function buildRegionBtn(id, icon, label, count, onclick) {
+        const btn = document.createElement('button');
+        btn.className = 'region-btn' + (id === 'all-regions' ? ' active' : '');
+        btn.id = id;
+        btn.innerHTML = `${icon} ${label} <span class="region-count">${count > 0 ? count.toLocaleString('ar-SA') : ''}</span>`;
+        btn.onclick = onclick;
+        return btn;
+    }
+
+    async function loadRegionsBar() {
+        const scroll = document.getElementById('regions-scroll');
+        scroll.innerHTML = '';
+
+        // زر "الكل"
+        scroll.appendChild(buildRegionBtn('all-regions', '🌐', 'الكل', 0, () => setRegionFilter('', '')));
+
+        // فاصل
+        const div1 = document.createElement('div');
+        div1.className = 'regions-divider';
+        scroll.appendChild(div1);
+
+        // القارات
+        try {
+            const conts = await fetch('/api/continents').then(r => r.json());
+            conts.forEach(c => {
+                const icon = REGION_ICONS[c.name] || '🌐';
+                const btn = buildRegionBtn('cont-' + c.name, icon, c.name, c.count,
+                    () => setRegionFilter(c.name, ''));
+                scroll.appendChild(btn);
+            });
+        } catch(e) {}
+
+        // فاصل
+        const div2 = document.createElement('div');
+        div2.className = 'regions-divider';
+        scroll.appendChild(div2);
+
+        // أنواع المصادر
+        try {
+            const types = await fetch('/api/source-types').then(r => r.json());
+            types.slice(0, 8).forEach(t => {
+                const icon = TYPE_ICONS[t.type] || '📄';
+                const btn = buildRegionBtn('type-' + t.type, icon, t.type, t.count,
+                    () => setRegionFilter('', t.type));
+                scroll.appendChild(btn);
+            });
+        } catch(e) {}
+    }
+
+    function setRegionFilter(continent, sourceType) {
+        currentContinent = continent;
+        currentSourceType = sourceType;
+
+        // تحديث الأزرار
+        document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+        if (!continent && !sourceType) {
+            document.getElementById('all-regions')?.classList.add('active');
+        } else if (continent) {
+            document.getElementById('cont-' + continent)?.classList.add('active');
+        } else if (sourceType) {
+            document.getElementById('type-' + sourceType)?.classList.add('active');
+        }
+        loadNews(true);
     }
 
     // ===== تحميل المصادر للقائمة =====
@@ -782,6 +944,7 @@
 
         await loadStats();
         await loadSources();
+        await loadRegionsBar();
         await loadNews(true);
         startAutoRefresh();
     });
