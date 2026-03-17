@@ -248,10 +248,12 @@ def cleanup_old_news():
         conn2 = get_db(); conn2.execute("VACUUM"); conn2.close()
     except Exception as e: log.warning("خطأ cleanup: %s", e)
 
+_sent_ids = set()   # تتبع الأخبار المُرسَلة في الذاكرة (يتجدد عند كل إعادة تشغيل)
+
 def _fetch_and_send():
     """جلب الأخبار ثم إرسال الجديد للمجموعة"""
     fetch_all_feeds()
-    _send_news_to_group()  # يرسل أي خبر لم يُرسَل بعد (sent_to_group=0)
+    _send_news_to_group()
 
 def background_worker():
     log.info("بدء الخيط الخلفي...")
@@ -463,22 +465,29 @@ def _tg_send_article(title, summary, source, source_type, country, link, image_u
 
 
 def _send_news_to_group():
-    """إرسال الأخبار الجديدة للمجموعة — كل خبر كرسالة منفصلة بنفس تنسيق الخاص"""
-    if not BOT1_TOKEN or not GROUP_ID:
+    """إرسال الأخبار غير المُرسَلة — تتبع في الذاكرة لتجنب التكرار"""
+    if not BOT1_TOKEN or not ALL_DESTINATIONS:
         return
     try:
         conn = get_db()
         rows = conn.execute(
             "SELECT id, arabic_title, original_title, source_ar, source, source_type, "
             "link, country, summary_ar, summary, image_url, published "
-            "FROM news WHERE sent_to_group=0 ORDER BY fetched_at ASC LIMIT 10"
+            "FROM news ORDER BY fetched_at DESC LIMIT 200"
         ).fetchall()
-        if not rows:
-            conn.close()
+        conn.close()
+
+        # فلتر الأخبار التي لم تُرسَل بعد
+        new_rows = [r for r in rows if r["id"] not in _sent_ids]
+        if not new_rows:
+            log.info("لا توجد أخبار جديدة للإرسال")
             return
 
-        ids = []
-        for row in rows:
+        # أرسل أحدث 10 فقط في كل دورة
+        to_send = new_rows[:10]
+        log.info("📤 إرسال %d خبر جديد...", len(to_send))
+
+        for row in to_send:
             _tg_send_article(
                 title       = (row["arabic_title"] or row["original_title"] or "").strip(),
                 summary     = (row["summary_ar"] or row["summary"] or "").strip(),
@@ -489,14 +498,10 @@ def _send_news_to_group():
                 image_url   = (row["image_url"] or "").strip(),
                 published   = row["published"] or row["fetched_at"] or "",
             )
-            ids.append(row["id"])
-            time.sleep(1)   # تأخير بين الرسائل
+            _sent_ids.add(row["id"])
+            time.sleep(1)
 
-        placeholders = ",".join(["?"] * len(ids))
-        conn.execute(f"UPDATE news SET sent_to_group=1 WHERE id IN ({placeholders})", ids)
-        conn.commit()
-        conn.close()
-        log.info("📤 أُرسل %d خبر للمجموعة", len(ids))
+        log.info("✅ أُرسل %d خبر | إجمالي مُرسَل: %d", len(to_send), len(_sent_ids))
     except Exception as e:
         log.warning("خطأ _send_news_to_group: %s", e)
 
