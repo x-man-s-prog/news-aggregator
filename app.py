@@ -248,17 +248,20 @@ def cleanup_old_news():
         conn2 = get_db(); conn2.execute("VACUUM"); conn2.close()
     except Exception as e: log.warning("خطأ cleanup: %s", e)
 
+def _fetch_and_send():
+    """جلب الأخبار ثم إرسال الجديد للمجموعة"""
+    fetch_all_feeds()
+    _send_news_to_group()  # يرسل أي خبر لم يُرسَل بعد (sent_to_group=0)
+
 def background_worker():
     log.info("بدء الخيط الخلفي...")
     cleanup_old_news()
-    if fetch_all_feeds() > 0:
-        _send_news_to_group()
+    _fetch_and_send()
     cleanup_old_news(); gc.collect()
     while True:
         log.info("⏳ انتظار %d دقيقة...", FETCH_INTERVAL//60)
         time.sleep(FETCH_INTERVAL)
-        if fetch_all_feeds() > 0:
-            _send_news_to_group()
+        _fetch_and_send()
         cleanup_old_news(); gc.collect()
 
 
@@ -336,7 +339,7 @@ def manual_cleanup():
 
 @app.route("/api/refresh", methods=["POST"])
 def manual_refresh():
-    threading.Thread(target=fetch_all_feeds, daemon=True).start()
+    threading.Thread(target=_fetch_and_send, daemon=True).start()
     return jsonify({"status":"جاري التحديث..."})
 
 @app.route("/api/continents")
