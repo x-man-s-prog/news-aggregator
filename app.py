@@ -406,59 +406,60 @@ def _tg_send(text: str) -> None:
         log.warning("TG send error: %s", e)
 
 
+def _deliver_to_one(chat_id, caption_html, image_url):
+    """إرسال خبر واحد لوجهة واحدة (صورة أو نص)"""
+    if image_url:
+        try:
+            payload = json.dumps({
+                "chat_id": chat_id, "photo": image_url,
+                "caption": caption_html[:1024], "parse_mode": "HTML"
+            }, ensure_ascii=False).encode("utf-8")
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{BOT1_TOKEN}/sendPhoto",
+                data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                if json.loads(r.read()).get("ok"):
+                    return
+        except Exception:
+            pass
+    # fallback نصي
+    try:
+        payload = json.dumps({
+            "chat_id": chat_id, "text": caption_html[:4096], "parse_mode": "HTML"
+        }, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{BOT1_TOKEN}/sendMessage",
+            data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+        urllib.request.urlopen(req, timeout=15)
+    except Exception as e:
+        log.warning("TG send error [%s]: %s", chat_id, e)
+
+
 def _tg_send_article(title, summary, source, source_type, country, link, image_url, published):
-    """إرسال خبر واحد لكل الوجهات (المجموعة + الهاتف الشخصي) بنفس التنسيق"""
-    # تنسيق التاريخ
+    """إرسال خبر لكل الوجهات في نفس الوقت (متوازي)"""
     try:
         dt = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
         date_str = dt.strftime("%Y/%m/%d  %H:%M")
     except Exception:
         date_str = ""
 
-    # بناء النص بنفس تنسيق الخاص
     text_parts = [f"🔴 {title}"]
     if summary:
         text_parts.append(f"\n{summary[:600]}")
     text_parts.append(f"\n🌐 {source_type or 'دولي'} • 🛸 {source} •")
     if date_str:
         text_parts.append(date_str)
-    caption = "\n".join(text_parts)
-    caption_html = caption + (f'\n<a href="{link}">📎 اقرأ الخبر كاملاً</a>' if link else "")
+    caption_html = "\n".join(text_parts) + (f'\n<a href="{link}">📎 اقرأ الخبر كاملاً</a>' if link else "")
 
-    for chat_id in ALL_DESTINATIONS:
-        sent = False
-        # محاولة إرسال مع صورة
-        if image_url:
-            try:
-                payload = json.dumps({
-                    "chat_id": chat_id,
-                    "photo": image_url,
-                    "caption": caption_html[:1024],
-                    "parse_mode": "HTML"
-                }, ensure_ascii=False).encode("utf-8")
-                req = urllib.request.Request(
-                    f"https://api.telegram.org/bot{BOT1_TOKEN}/sendPhoto",
-                    data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
-                with urllib.request.urlopen(req, timeout=15) as r:
-                    if json.loads(r.read()).get("ok"):
-                        sent = True
-            except Exception:
-                pass
-
-        # إرسال نصي إذا لم تنجح الصورة
-        if not sent:
-            try:
-                payload = json.dumps({
-                    "chat_id": chat_id,
-                    "text": caption_html[:4096],
-                    "parse_mode": "HTML"
-                }, ensure_ascii=False).encode("utf-8")
-                req = urllib.request.Request(
-                    f"https://api.telegram.org/bot{BOT1_TOKEN}/sendMessage",
-                    data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
-                urllib.request.urlopen(req, timeout=15)
-            except Exception as e:
-                log.warning("TG send error [%s]: %s", chat_id, e)
+    # إرسال متوازي لكل الوجهات في نفس اللحظة
+    threads = [
+        threading.Thread(target=_deliver_to_one, args=(cid, caption_html, image_url), daemon=True)
+        for cid in ALL_DESTINATIONS
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
 
 
 def _send_news_to_group():
