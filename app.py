@@ -385,8 +385,12 @@ def status_page():
 # ══════════════════════════════════════════════════════════
 # تكامل تيليجرام - @Sa10220bot يستقبل الأوامر في المجموعة
 # ══════════════════════════════════════════════════════════
-BOT1_TOKEN  = os.getenv("BOT1_TOKEN", "8768938352:AAGZsnJH3mqTIWULkW7DhKeGr_EflnV3Wys")
-GROUP_ID    = os.getenv("GROUP_CHAT_ID", "-1003782532470")
+BOT1_TOKEN      = os.getenv("BOT1_TOKEN", "8768938352:AAGZsnJH3mqTIWULkW7DhKeGr_EflnV3Wys")
+GROUP_ID        = os.getenv("GROUP_CHAT_ID", "-1003782532470")
+PERSONAL_CHAT_ID = os.getenv("PERSONAL_CHAT_ID", "915765345")
+
+# قائمة كل الوجهات (المجموعة + الهاتف الشخصي)
+ALL_DESTINATIONS = [d for d in [GROUP_ID, PERSONAL_CHAT_ID] if d]
 
 def _tg_send(text: str) -> None:
     """إرسال رسالة للمجموعة"""
@@ -403,7 +407,7 @@ def _tg_send(text: str) -> None:
 
 
 def _tg_send_article(title, summary, source, source_type, country, link, image_url, published):
-    """إرسال خبر واحد بنفس تنسيق الخاص: صورة + كابشن"""
+    """إرسال خبر واحد لكل الوجهات (المجموعة + الهاتف الشخصي) بنفس التنسيق"""
     # تنسيق التاريخ
     try:
         dt = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
@@ -415,52 +419,46 @@ def _tg_send_article(title, summary, source, source_type, country, link, image_u
     text_parts = [f"🔴 {title}"]
     if summary:
         text_parts.append(f"\n{summary[:600]}")
-    src_line = f"\n🌐 {source_type or 'دولي'} • 🛸 {source} •"
-    text_parts.append(src_line)
+    text_parts.append(f"\n🌐 {source_type or 'دولي'} • 🛸 {source} •")
     if date_str:
         text_parts.append(date_str)
-
     caption = "\n".join(text_parts)
+    caption_html = caption + (f'\n<a href="{link}">📎 اقرأ الخبر كاملاً</a>' if link else "")
 
-    # إضافة رابط "اقرأ الخبر كاملاً" عبر HTML
-    if link:
-        caption_html = caption + f'\n<a href="{link}">📎 اقرأ الخبر كاملاً</a>'
-    else:
-        caption_html = caption
+    for chat_id in ALL_DESTINATIONS:
+        sent = False
+        # محاولة إرسال مع صورة
+        if image_url:
+            try:
+                payload = json.dumps({
+                    "chat_id": chat_id,
+                    "photo": image_url,
+                    "caption": caption_html[:1024],
+                    "parse_mode": "HTML"
+                }, ensure_ascii=False).encode("utf-8")
+                req = urllib.request.Request(
+                    f"https://api.telegram.org/bot{BOT1_TOKEN}/sendPhoto",
+                    data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    if json.loads(r.read()).get("ok"):
+                        sent = True
+            except Exception:
+                pass
 
-    # محاولة إرسال مع صورة أولاً
-    if image_url:
-        try:
-            payload = json.dumps({
-                "chat_id": GROUP_ID,
-                "photo": image_url,
-                "caption": caption_html[:1024],
-                "parse_mode": "HTML"
-            }, ensure_ascii=False).encode("utf-8")
-            req = urllib.request.Request(
-                f"https://api.telegram.org/bot{BOT1_TOKEN}/sendPhoto",
-                data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
-            with urllib.request.urlopen(req, timeout=15) as r:
-                result = json.loads(r.read())
-                if result.get("ok"):
-                    return
-        except Exception:
-            pass  # fallback to text
-
-    # إرسال نصي (بدون صورة أو عند فشل الصورة)
-    payload = json.dumps({
-        "chat_id": GROUP_ID,
-        "text": caption_html[:4096],
-        "parse_mode": "HTML",
-        "disable_web_page_preview": False
-    }, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        f"https://api.telegram.org/bot{BOT1_TOKEN}/sendMessage",
-        data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
-    try:
-        urllib.request.urlopen(req, timeout=15)
-    except Exception as e:
-        log.warning("TG send article error: %s", e)
+        # إرسال نصي إذا لم تنجح الصورة
+        if not sent:
+            try:
+                payload = json.dumps({
+                    "chat_id": chat_id,
+                    "text": caption_html[:4096],
+                    "parse_mode": "HTML"
+                }, ensure_ascii=False).encode("utf-8")
+                req = urllib.request.Request(
+                    f"https://api.telegram.org/bot{BOT1_TOKEN}/sendMessage",
+                    data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+                urllib.request.urlopen(req, timeout=15)
+            except Exception as e:
+                log.warning("TG send error [%s]: %s", chat_id, e)
 
 
 def _send_news_to_group():
