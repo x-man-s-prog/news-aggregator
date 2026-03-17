@@ -402,14 +402,76 @@ def _tg_send(text: str) -> None:
         log.warning("TG send error: %s", e)
 
 
+def _tg_send_article(title, summary, source, source_type, country, link, image_url, published):
+    """إرسال خبر واحد بنفس تنسيق الخاص: صورة + كابشن"""
+    # تنسيق التاريخ
+    try:
+        dt = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
+        date_str = dt.strftime("%Y/%m/%d  %H:%M")
+    except Exception:
+        date_str = ""
+
+    # بناء النص بنفس تنسيق الخاص
+    text_parts = [f"🔴 {title}"]
+    if summary:
+        text_parts.append(f"\n{summary[:600]}")
+    src_line = f"\n🌐 {source_type or 'دولي'} • 🛸 {source} •"
+    text_parts.append(src_line)
+    if date_str:
+        text_parts.append(date_str)
+
+    caption = "\n".join(text_parts)
+
+    # إضافة رابط "اقرأ الخبر كاملاً" عبر HTML
+    if link:
+        caption_html = caption + f'\n<a href="{link}">📎 اقرأ الخبر كاملاً</a>'
+    else:
+        caption_html = caption
+
+    # محاولة إرسال مع صورة أولاً
+    if image_url:
+        try:
+            payload = json.dumps({
+                "chat_id": GROUP_ID,
+                "photo": image_url,
+                "caption": caption_html[:1024],
+                "parse_mode": "HTML"
+            }, ensure_ascii=False).encode("utf-8")
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{BOT1_TOKEN}/sendPhoto",
+                data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                result = json.loads(r.read())
+                if result.get("ok"):
+                    return
+        except Exception:
+            pass  # fallback to text
+
+    # إرسال نصي (بدون صورة أو عند فشل الصورة)
+    payload = json.dumps({
+        "chat_id": GROUP_ID,
+        "text": caption_html[:4096],
+        "parse_mode": "HTML",
+        "disable_web_page_preview": False
+    }, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{BOT1_TOKEN}/sendMessage",
+        data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+    try:
+        urllib.request.urlopen(req, timeout=15)
+    except Exception as e:
+        log.warning("TG send article error: %s", e)
+
+
 def _send_news_to_group():
-    """إرسال الأخبار الجديدة للمجموعة — كل خبر كرسالة منفصلة"""
+    """إرسال الأخبار الجديدة للمجموعة — كل خبر كرسالة منفصلة بنفس تنسيق الخاص"""
     if not BOT1_TOKEN or not GROUP_ID:
         return
     try:
         conn = get_db()
         rows = conn.execute(
-            "SELECT id, arabic_title, original_title, source_ar, source, link, country, summary_ar, summary "
+            "SELECT id, arabic_title, original_title, source_ar, source, source_type, "
+            "link, country, summary_ar, summary, image_url, published "
             "FROM news WHERE sent_to_group=0 ORDER BY fetched_at ASC LIMIT 10"
         ).fetchall()
         if not rows:
@@ -418,26 +480,18 @@ def _send_news_to_group():
 
         ids = []
         for row in rows:
-            title   = (row["arabic_title"] or row["original_title"] or "").strip()
-            source  = (row["source_ar"] or row["source"] or "").strip()
-            link    = (row["link"] or "").strip()
-            country = (row["country"] or "").strip()
-            summary = (row["summary_ar"] or row["summary"] or "").strip()
-
-            # بناء الرسالة — نفس أسلوب الخاص
-            parts = []
-            if country:
-                parts.append(f"🌍 {country}")
-            parts.append(f"📰 {title}")
-            if summary:
-                parts.append(f"\n{summary[:200]}")
-            parts.append(f"\n📡 {source}")
-            if link:
-                parts.append(f"🔗 {link}")
-
-            _tg_send("\n".join(parts))
+            _tg_send_article(
+                title       = (row["arabic_title"] or row["original_title"] or "").strip(),
+                summary     = (row["summary_ar"] or row["summary"] or "").strip(),
+                source      = (row["source_ar"] or row["source"] or "").strip(),
+                source_type = (row["source_type"] or "دولي").strip(),
+                country     = (row["country"] or "").strip(),
+                link        = (row["link"] or "").strip(),
+                image_url   = (row["image_url"] or "").strip(),
+                published   = row["published"] or row["fetched_at"] or "",
+            )
             ids.append(row["id"])
-            time.sleep(0.8)   # تأخير بسيط بين الرسائل
+            time.sleep(1)   # تأخير بين الرسائل
 
         placeholders = ",".join(["?"] * len(ids))
         conn.execute(f"UPDATE news SET sent_to_group=1 WHERE id IN ({placeholders})", ids)
