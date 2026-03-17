@@ -192,6 +192,8 @@ def fetch_source(source):
                 if val: summary = re.sub(r"<[^>]+>","",val)[:400]; break
             summary_ar = summary if is_ar else (translate_to_arabic(summary[:300], src_lang) if summary else "")
             if summary and not is_ar: time.sleep(0.2)
+            img = get_entry_image(entry)
+            pub = parse_date(entry)
             c.execute("""INSERT OR IGNORE INTO news
                 (id,source,source_ar,country,source_type,original_title,arabic_title,
                  summary,summary_ar,image_url,link,published,original_lang,fetched_at)
@@ -199,9 +201,17 @@ def fetch_source(source):
                 (aid, source["name"], source.get("name_ar",source["name"]),
                  source.get("country",""), source.get("type",""),
                  title, arabic_title, summary, summary_ar,
-                 get_entry_image(entry), link, parse_date(entry),
+                 img, link, pub,
                  source.get("lang","en"), datetime.now(timezone.utc).isoformat()))
-            new_count += 1
+            if c.rowcount:   # خبر جديد فعلاً — أرسله فوراً
+                new_count += 1
+                _tg_queue.put({
+                    "title": arabic_title, "summary": summary_ar or summary,
+                    "source": source.get("name_ar", source["name"]),
+                    "source_type": source.get("type","دولي"),
+                    "country": source.get("country",""),
+                    "link": link, "image_url": img, "published": pub,
+                })
         conn.commit(); conn.close()
         del feed; gc.collect()
         if new_count > 0: log.info("✓ %s: %d مقال", source["name"], new_count)
@@ -248,22 +258,18 @@ def cleanup_old_news():
         conn2 = get_db(); conn2.execute("VACUUM"); conn2.close()
     except Exception as e: log.warning("خطأ cleanup: %s", e)
 
-_sent_ids = set()   # تتبع الأخبار المُرسَلة في الذاكرة (يتجدد عند كل إعادة تشغيل)
-
-def _fetch_and_send():
-    """جلب الأخبار ثم إرسال الجديد للمجموعة"""
-    fetch_all_feeds()
-    _send_news_to_group()
+import queue as _queue_mod
+_tg_queue = _queue_mod.Queue()   # طابور الأخبار الجديدة للإرسال الفوري
 
 def background_worker():
     log.info("بدء الخيط الخلفي...")
     cleanup_old_news()
-    _fetch_and_send()
+    fetch_all_feeds()
     cleanup_old_news(); gc.collect()
     while True:
         log.info("⏳ انتظار %d دقيقة...", FETCH_INTERVAL//60)
         time.sleep(FETCH_INTERVAL)
-        _fetch_and_send()
+        fetch_all_feeds()
         cleanup_old_news(); gc.collect()
 
 
@@ -341,14 +347,8 @@ def manual_cleanup():
 
 @app.route("/api/refresh", methods=["POST"])
 def manual_refresh():
-    threading.Thread(target=_fetch_and_send, daemon=True).start()
+    threading.Thread(target=fetch_all_feeds, daemon=True).start()
     return jsonify({"status":"جاري التحديث..."})
-
-@app.route("/api/send-now", methods=["POST"])
-def send_now():
-    """إرسال الأخبار غير المُرسَلة للمجموعة فوراً"""
-    threading.Thread(target=_send_news_to_group, daemon=True).start()
-    return jsonify({"status":"جاري الإرسال للمجموعة..."})
 
 @app.route("/api/continents")
 def get_continents():
@@ -464,46 +464,27 @@ def _tg_send_article(title, summary, source, source_type, country, link, image_u
         t.join(timeout=20)
 
 
-def _send_news_to_group():
-    """إرسال الأخبار غير المُرسَلة — تتبع في الذاكرة لتجنب التكرار"""
-    if not BOT1_TOKEN or not ALL_DESTINATIONS:
-        return
-    try:
-        conn = get_db()
-        rows = conn.execute(
-            "SELECT id, arabic_title, original_title, source_ar, source, source_type, "
-            "link, country, summary_ar, summary, image_url, published "
-            "FROM news ORDER BY fetched_at DESC LIMIT 200"
-        ).fetchall()
-        conn.close()
-
-        # فلتر الأخبار التي لم تُرسَل بعد
-        new_rows = [r for r in rows if r["id"] not in _sent_ids]
-        if not new_rows:
-            log.info("لا توجد أخبار جديدة للإرسال")
-            return
-
-        # أرسل أحدث 10 فقط في كل دورة
-        to_send = new_rows[:10]
-        log.info("📤 إرسال %d خبر جديد...", len(to_send))
-
-        for row in to_send:
+def _tg_sender_worker():
+    """Thread يعمل باستمرار — يرسل كل خبر جديد فور وصوله للطابور"""
+    log.info("📡 sender thread يعمل...")
+    while True:
+        try:
+            art = _tg_queue.get(timeout=60)
             _tg_send_article(
-                title       = (row["arabic_title"] or row["original_title"] or "").strip(),
-                summary     = (row["summary_ar"] or row["summary"] or "").strip(),
-                source      = (row["source_ar"] or row["source"] or "").strip(),
-                source_type = (row["source_type"] or "دولي").strip(),
-                country     = (row["country"] or "").strip(),
-                link        = (row["link"] or "").strip(),
-                image_url   = (row["image_url"] or "").strip(),
-                published   = row["published"] or row["fetched_at"] or "",
+                title       = art.get("title",""),
+                summary     = art.get("summary",""),
+                source      = art.get("source",""),
+                source_type = art.get("source_type","دولي"),
+                country     = art.get("country",""),
+                link        = art.get("link",""),
+                image_url   = art.get("image_url",""),
+                published   = art.get("published",""),
             )
-            _sent_ids.add(row["id"])
-            time.sleep(1)
-
-        log.info("✅ أُرسل %d خبر | إجمالي مُرسَل: %d", len(to_send), len(_sent_ids))
-    except Exception as e:
-        log.warning("خطأ _send_news_to_group: %s", e)
+            time.sleep(2)   # تأخير بسيط بين الرسائل لتجنب flood
+        except _queue_mod.Empty:
+            pass
+        except Exception as e:
+            log.warning("sender error: %s", e)
 
 
 def _tg_poll_commands():
@@ -555,6 +536,7 @@ init_db()
 threading.Thread(target=background_worker,     daemon=True).start()
 threading.Thread(target=_memory_watchdog,      daemon=True).start()
 threading.Thread(target=_tg_poll_commands,     daemon=True).start()
+threading.Thread(target=_tg_sender_worker,     daemon=True).start()  # إرسال فوري
 
 
 if __name__ == "__main__":
