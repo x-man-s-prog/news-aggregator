@@ -1,4 +1,5 @@
 import feedparser, threading, sqlite3, time, hashlib, logging, os, gc, re, socket as _socket
+import urllib.request, json
 import psutil
 from datetime import datetime, timezone
 from flask import Flask, jsonify, render_template, request, redirect
@@ -369,9 +370,75 @@ def status_page():
     return redirect("/api/fetch-status")
 
 
+# ══════════════════════════════════════════════════════════
+# تكامل تيليجرام - @Sa10220bot يستقبل الأوامر في المجموعة
+# ══════════════════════════════════════════════════════════
+BOT1_TOKEN  = os.getenv("BOT1_TOKEN", "8768938352:AAGZsnJH3mqTIWULkW7DhKeGr_EflnV3Wys")
+GROUP_ID    = os.getenv("GROUP_CHAT_ID", "-1003782532470")
+
+def _tg_send(text: str) -> None:
+    """إرسال رسالة للمجموعة"""
+    if not BOT1_TOKEN or not GROUP_ID:
+        return
+    try:
+        payload = json.dumps({"chat_id": GROUP_ID, "text": text}).encode()
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{BOT1_TOKEN}/sendMessage",
+            data=payload, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        log.warning("TG send error: %s", e)
+
+
+def _tg_poll_commands():
+    """
+    يستقبل الأوامر من المجموعة:
+      /stats  → إحصائيات المصادر والأخبار
+      /now    → عدد الأخبار الجديدة
+    """
+    offset = 0
+    time.sleep(10)
+    log.info("🎧 Bot1 يستمع للأوامر في المجموعة...")
+    while True:
+        try:
+            url = (f"https://api.telegram.org/bot{BOT1_TOKEN}/getUpdates"
+                   f"?timeout=25&offset={offset}&allowed_updates=message")
+            with urllib.request.urlopen(url, timeout=35) as r:
+                updates = json.loads(r.read()).get("result", [])
+            for upd in updates:
+                offset = upd["update_id"] + 1
+                msg  = upd.get("message", {})
+                text = msg.get("text", "").strip().lower()
+                if not text:
+                    continue
+
+                if text in ("/stats", "/stats@sa10220bot"):
+                    conn = get_db()
+                    total = conn.execute("SELECT COUNT(*) FROM news").fetchone()[0]
+                    last_h = conn.execute(
+                        "SELECT COUNT(*) FROM news WHERE fetched_at > datetime('now','-1 hour')"
+                    ).fetchone()[0]
+                    sources_active = conn.execute(
+                        "SELECT COUNT(DISTINCT source) FROM news"
+                    ).fetchone()[0]
+                    conn.close()
+                    _tg_send(
+                        f"📊 إحصائيات البوت الأول\n\n"
+                        f"🗞 إجمالي الأخبار: {total:,}\n"
+                        f"⏱ آخر ساعة: {last_h:,} خبر\n"
+                        f"📡 مصادر نشطة: {sources_active} مصدر\n"
+                        f"🕐 آخر تحديث: {datetime.now(timezone.utc).strftime('%H:%M UTC')}"
+                    )
+
+        except Exception as e:
+            log.warning("Bot1 poll error: %s", e)
+            time.sleep(5)
+
+
 init_db()
-threading.Thread(target=background_worker, daemon=True).start()
-threading.Thread(target=_memory_watchdog,  daemon=True).start()
+threading.Thread(target=background_worker,     daemon=True).start()
+threading.Thread(target=_memory_watchdog,      daemon=True).start()
+threading.Thread(target=_tg_poll_commands,     daemon=True).start()
 
 
 if __name__ == "__main__":
