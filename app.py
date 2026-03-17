@@ -445,7 +445,7 @@ def _tg_send_article(title, summary, source, source_type, country, link, image_u
     except Exception:
         date_str = ""
 
-    text_parts = [f"🔴 {title}"]
+    text_parts = [f"🔴 <b>{title}</b>"]
     if summary:
         text_parts.append(f"\n{summary[:600]}")
     text_parts.append(f"\n🌐 {source_type or 'دولي'} • 🛸 {source} •")
