@@ -403,38 +403,47 @@ def _tg_send(text: str) -> None:
 
 
 def _send_news_to_group():
-    """إرسال الأخبار الجديدة للمجموعة بعد كل جلب (أحدث 5 أخبار غير مُرسَلة)"""
+    """إرسال الأخبار الجديدة للمجموعة — كل خبر كرسالة منفصلة"""
     if not BOT1_TOKEN or not GROUP_ID:
         return
     try:
         conn = get_db()
         rows = conn.execute(
-            "SELECT id, arabic_title, original_title, source_ar, source, link, country "
-            "FROM news WHERE sent_to_group=0 ORDER BY fetched_at DESC LIMIT 5"
+            "SELECT id, arabic_title, original_title, source_ar, source, link, country, summary_ar, summary "
+            "FROM news WHERE sent_to_group=0 ORDER BY fetched_at ASC LIMIT 10"
         ).fetchall()
         if not rows:
             conn.close()
             return
 
-        lines = ["🗞 أخبار جديدة:"]
         ids = []
         for row in rows:
-            title  = (row["arabic_title"] or row["original_title"] or "")[:120]
-            source = row["source_ar"] or row["source"] or ""
-            link   = row["link"] or ""
-            country= row["country"] or ""
-            flag   = f" | {country}" if country else ""
-            lines.append(f"\n• {title}\n  📡 {source}{flag}" + (f"\n  🔗 {link}" if link else ""))
+            title   = (row["arabic_title"] or row["original_title"] or "").strip()
+            source  = (row["source_ar"] or row["source"] or "").strip()
+            link    = (row["link"] or "").strip()
+            country = (row["country"] or "").strip()
+            summary = (row["summary_ar"] or row["summary"] or "").strip()
+
+            # بناء الرسالة — نفس أسلوب الخاص
+            parts = []
+            if country:
+                parts.append(f"🌍 {country}")
+            parts.append(f"📰 {title}")
+            if summary:
+                parts.append(f"\n{summary[:200]}")
+            parts.append(f"\n📡 {source}")
+            if link:
+                parts.append(f"🔗 {link}")
+
+            _tg_send("\n".join(parts))
             ids.append(row["id"])
+            time.sleep(0.8)   # تأخير بسيط بين الرسائل
 
-        _tg_send("\n".join(lines))
-
-        # ضع علامة "أُرسل" على هذه الأخبار
         placeholders = ",".join(["?"] * len(ids))
         conn.execute(f"UPDATE news SET sent_to_group=1 WHERE id IN ({placeholders})", ids)
         conn.commit()
         conn.close()
-        log.info("📤 أُرسل %d خبر جديد للمجموعة", len(ids))
+        log.info("📤 أُرسل %d خبر للمجموعة", len(ids))
     except Exception as e:
         log.warning("خطأ _send_news_to_group: %s", e)
 
