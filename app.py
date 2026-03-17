@@ -94,7 +94,8 @@ def init_db():
         image_url TEXT DEFAULT "", link TEXT, published TEXT,
         original_lang TEXT DEFAULT "en", fetched_at TEXT NOT NULL)""")
     for s in ["ALTER TABLE news ADD COLUMN image_url TEXT DEFAULT \"\"",
-              "ALTER TABLE news ADD COLUMN summary_ar TEXT"]:
+              "ALTER TABLE news ADD COLUMN summary_ar TEXT",
+              "ALTER TABLE news ADD COLUMN sent_to_group INTEGER DEFAULT 0"]:
         try: c.execute(s)
         except: pass
     for idx in [
@@ -250,12 +251,14 @@ def cleanup_old_news():
 def background_worker():
     log.info("بدء الخيط الخلفي...")
     cleanup_old_news()
-    fetch_all_feeds()
+    if fetch_all_feeds() > 0:
+        _send_news_to_group()
     cleanup_old_news(); gc.collect()
     while True:
         log.info("⏳ انتظار %d دقيقة...", FETCH_INTERVAL//60)
         time.sleep(FETCH_INTERVAL)
-        fetch_all_feeds()
+        if fetch_all_feeds() > 0:
+            _send_news_to_group()
         cleanup_old_news(); gc.collect()
 
 
@@ -388,6 +391,43 @@ def _tg_send(text: str) -> None:
         urllib.request.urlopen(req, timeout=10)
     except Exception as e:
         log.warning("TG send error: %s", e)
+
+
+def _send_news_to_group():
+    """إرسال الأخبار الجديدة للمجموعة بعد كل جلب (أحدث 5 أخبار غير مُرسَلة)"""
+    if not BOT1_TOKEN or not GROUP_ID:
+        return
+    try:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT id, arabic_title, original_title, source_ar, source, link, country "
+            "FROM news WHERE sent_to_group=0 ORDER BY fetched_at DESC LIMIT 5"
+        ).fetchall()
+        if not rows:
+            conn.close()
+            return
+
+        lines = ["🗞 أخبار جديدة:"]
+        ids = []
+        for row in rows:
+            title  = (row["arabic_title"] or row["original_title"] or "")[:120]
+            source = row["source_ar"] or row["source"] or ""
+            link   = row["link"] or ""
+            country= row["country"] or ""
+            flag   = f" | {country}" if country else ""
+            lines.append(f"\n• {title}\n  📡 {source}{flag}" + (f"\n  🔗 {link}" if link else ""))
+            ids.append(row["id"])
+
+        _tg_send("\n".join(lines))
+
+        # ضع علامة "أُرسل" على هذه الأخبار
+        placeholders = ",".join(["?"] * len(ids))
+        conn.execute(f"UPDATE news SET sent_to_group=1 WHERE id IN ({placeholders})", ids)
+        conn.commit()
+        conn.close()
+        log.info("📤 أُرسل %d خبر جديد للمجموعة", len(ids))
+    except Exception as e:
+        log.warning("خطأ _send_news_to_group: %s", e)
 
 
 def _tg_poll_commands():
