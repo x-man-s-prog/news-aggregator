@@ -576,59 +576,69 @@ def _bot2_send(text: str) -> None:
 def _bot2_digest_worker():
     """يرسل ملخص الأخبار كل 10 دقائق عبر @news_87687bot"""
     log.info("📋 Bot2 digest worker يعمل (كل %d دقيقة)...", BOT2_INTERVAL // 60)
-    # انتظر أول دورة جلب تنتهي
-    time.sleep(120)
+    # أول تشغيل: انتظر 3 دقائق فقط ثم أرسل ملخص آخر 30 دقيقة
+    time.sleep(180)
+    first_run = True
     while True:
         try:
+            # أول تشغيل يأخذ آخر 30 دقيقة، بعدها كل 10 دقائق
+            window = "-30 minutes" if first_run else f"-{BOT2_INTERVAL + 60} seconds"
+            first_run = False
+
             conn = get_db()
             rows = conn.execute(
                 """SELECT arabic_title, summary_ar, summary, country, source_ar, source, link
                    FROM news
                    WHERE fetched_at >= datetime('now', ?)
                    ORDER BY country, fetched_at DESC""",
-                (f"-{BOT2_INTERVAL + 60} seconds",)
+                (window,)
             ).fetchall()
             conn.close()
 
             if not rows:
-                log.info("Bot2: لا أخبار جديدة في آخر 10 دقائق")
+                log.info("Bot2: لا أخبار جديدة")
                 time.sleep(BOT2_INTERVAL)
                 continue
+
+            # إزالة العناوين المكررة
+            seen_titles = set()
+            unique_rows = []
+            for row in rows:
+                t = (row["arabic_title"] or "").strip()
+                if t and t not in seen_titles:
+                    seen_titles.add(t)
+                    unique_rows.append(row)
 
             # بناء الرسالة
             now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
             lines   = [f"📰 <b>ملخص أخبار — {now_str}</b>\n━━━━━━━━━━━━━━━━━━━━"]
 
-            for row in rows:
+            for row in unique_rows:
                 title   = row["arabic_title"] or row["source_ar"] or ""
-                summary = (row["summary_ar"] or row["summary"] or "")[:120]
                 country = row["country"] or "دولي"
                 flag    = _flag(country)
-                # سطر واحد: 🇶🇦 قطر | العنوان المختصر
-                headline = title[:90] if title else summary[:90]
+                headline = title[:90]
                 if headline:
                     lines.append(f"{flag} <b>{country}</b> | {headline}")
 
-            lines.append(f"━━━━━━━━━━━━━━━━━━━━\n📊 {len(rows)} خبر")
+            lines.append(f"━━━━━━━━━━━━━━━━━━━━\n📊 {len(unique_rows)} خبر")
 
-            # إرسال — إذا الرسالة كبيرة قسّمها
+            # إرسال — قسّم إذا تجاوز 4096
             full_msg = "\n".join(lines)
             if len(full_msg) <= 4096:
                 _bot2_send(full_msg)
             else:
-                # قسّم على دفعات
-                chunk, count = [lines[0]], 0
+                chunk = [lines[0]]
                 for line in lines[1:]:
                     if sum(len(l)+1 for l in chunk) + len(line) > 3800:
                         _bot2_send("\n".join(chunk))
                         time.sleep(2)
-                        chunk = []
-                        count += 1
+                        chunk = [lines[0]]
                     chunk.append(line)
-                if chunk:
+                if len(chunk) > 1:
                     _bot2_send("\n".join(chunk))
 
-            log.info("Bot2: أُرسل ملخص %d خبر", len(rows))
+            log.info("Bot2: أُرسل ملخص %d خبر", len(unique_rows))
 
         except Exception as e:
             log.warning("Bot2 digest error: %s", e)
