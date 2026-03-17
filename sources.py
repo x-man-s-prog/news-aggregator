@@ -1,4 +1,4 @@
-# قائمة مصادر الأخبار مع روابط RSS — 1315 مصدر
+# قائمة مصادر الأخبار مع روابط RSS — 1388 مصدر
 # lang: ar = عربي (بدون ترجمة), en/fr/de/... = يُترجم للعربية
 
 SOURCES = [
@@ -1650,5 +1650,88 @@ SOURCES = [
     {"id": 10691 ,"name": "صوت الأمة                          ", "name_ar": "صوت الأمة                          ", "country": "مصر                 ", "type": "صحيفة", "lang": "ar", "url": "https://www.soutalomma.com/rss"},
     {"id": 10692 ,"name": "عين مصر                            ", "name_ar": "عين مصر                            ", "country": "مصر                 ", "type": "صحيفة", "lang": "ar", "url": "https://www.ainmasralarabia.com/feed"},
     {"id": 10693 ,"name": "محيط مصر                           ", "name_ar": "محيط مصر                           ", "country": "مصر                 ", "type": "صحيفة", "lang": "ar", "url": "https://www.moheet.com/rss"},
+
+    # ══════════════════════════════════════════
+    # الجهات الحكومية القطرية (وزارات + هيئات + تويتر rsshub)
+    # ══════════════════════════════════════════
+
+    {"id": 10694 ,"name": "ديوان الأمير                                 ", "name_ar": "ديوان الأمير                                 ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/AmiriDiwan"},
+    {"id": 10695 ,"name": "مجلس الوزراء القطري                          ", "name_ar": "مجلس الوزراء القطري                          ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/GOVQatar"},
+    {"id": 10696 ,"name": "رئاسة مجلس الوزراء                           ", "name_ar": "رئاسة مجلس الوزراء                           ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://www.gco.gov.qa/ar/feed"},
+    {"id": 10697 ,"name": "وزارة الداخلية القطرية                       ", "name_ar": "وزارة الداخلية                               ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MOI_Qatar"},
+    {"id": 10698 ,"name": "وزارة الخارجية القطرية                       ", "name_ar": "وزارة الخارجية                               ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MofaQatar_AR"},
+    {"id": 10699 ,"name": "وزارة الخارجية EN                            ", "name_ar": "وزارة الخارجية EN                            ", "country": "قطر", "type": "حكومي", "lang": "en", "url": "https://rsshub.app/twitter/user/MofaQatar_EN"},
+    {"id": 10700 ,"name": "وزارة المالية القطرية                        ", "name_ar": "وزارة المالية                                ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MOF_Qatar"},
+    {"id": 10701 ,"name": "وزارة التربية والتعليم                       ", "name_ar": "وزارة التربية والتعليم                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MOEQatar"},
+    {"id": 10702 ,"name": "وزارة الصحة العامة                           ", "name_ar": "وزارة الصحة العامة                           ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MOPHQatar"},
+    {"id": 10703 ,"name": "وزارة العمل القطرية                          ", "name_ar": "وزارة العمل                                  ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MolQatar"},
+    {"id": 10704 ,"name": "وزارة البيئة والمناخ                         ", "name_ar": "وزارة البيئة والتغير المناخي                 ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MECCC_Qatar"},
+    {"id": 10705 ,"name": "وزارة الاتصالات وتقنية المعلومات             ", "name_ar": "وزارة الاتصالات                              ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MCIT_Qatar"},
+    {"id": 10706 ,"name": "وزارة التنمية الاجتماعية                     ", "name_ar": "وزارة التنمية الاجتماعية والأسرة             ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MSDQ_Qatar"},
+    {"id": 10707 ,"name": "وزارة الثقافة القطرية                        ", "name_ar": "وزارة الثقافة                                ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MC_Qatar"},
+    {"id": 10708 ,"name": "وزارة التجارة والصناعة                       ", "name_ar": "وزارة التجارة والصناعة                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MOCI_Qatar"},
+    {"id": 10709 ,"name": "وزارة الشباب والرياضة                        ", "name_ar": "وزارة الشباب والرياضة                        ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MOSY_Qatar"},
+    {"id": 10710 ,"name": "وزارة العدل القطرية                          ", "name_ar": "وزارة العدل                                  ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MOJ_Qatar"},
+    {"id": 10711 ,"name": "وزارة الأوقاف والشؤون الإسلامية              ", "name_ar": "وزارة الأوقاف                                ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/Awqaf_Qatar"},
+    {"id": 10712 ,"name": "وزارة البلديات والبيئة                       ", "name_ar": "وزارة البلديات والبيئة                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MMEQatar"},
+    {"id": 10713 ,"name": "وزارة المواصلات والاتصالات                   ", "name_ar": "وزارة المواصلات                              ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MotcQatar"},
+    {"id": 10714 ,"name": "وكالة قطر للأنباء AR                         ", "name_ar": "وكالة قطر للأنباء                            ", "country": "قطر", "type": "وكالة أنباء", "lang": "ar", "url": "https://www.qna.org.qa/ar/rss"},
+    {"id": 10715 ,"name": "وكالة قطر للأنباء EN                         ", "name_ar": "Qatar News Agency EN                         ", "country": "قطر", "type": "وكالة أنباء", "lang": "en", "url": "https://www.qna.org.qa/en/rss"},
+    {"id": 10716 ,"name": "QNA Twitter                                  ", "name_ar": "وكالة قطر للأنباء تويتر                      ", "country": "قطر", "type": "وكالة أنباء", "lang": "ar", "url": "https://rsshub.app/twitter/user/QNAQatar"},
+    {"id": 10717 ,"name": "قطر تيليفزيون                                ", "name_ar": "قطر تليفزيون                                 ", "country": "قطر", "type": "تلفزيون", "lang": "ar", "url": "https://rsshub.app/twitter/user/AlKassTV"},
+    {"id": 10718 ,"name": "بي ان سبورتس                                 ", "name_ar": "بي ان سبورتس                                 ", "country": "قطر", "type": "تلفزيون", "lang": "ar", "url": "https://rsshub.app/twitter/user/beINSPORTS"},
+    {"id": 10719 ,"name": "مؤسسة قطر                                    ", "name_ar": "مؤسسة قطر                                    ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarFoundation"},
+    {"id": 10720 ,"name": "جهاز قطر للاستثمار                           ", "name_ar": "جهاز قطر للاستثمار QIA                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QIA_Official"},
+    {"id": 10721 ,"name": "أشغال قطر                                    ", "name_ar": "أشغال - هيئة الأشغال العامة                  ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarAshghal"},
+    {"id": 10722 ,"name": "كهرماء قطر                                   ", "name_ar": "كهرماء                                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/kahramaaQatar"},
+    {"id": 10723 ,"name": "هيئة السياحة القطرية                         ", "name_ar": "هيئة السياحة القطرية                         ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/visitqatar"},
+    {"id": 10724 ,"name": "مؤسسة حمد الطبية                             ", "name_ar": "مؤسسة حمد الطبية                             ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/HMCQatar"},
+    {"id": 10725 ,"name": "مؤسسة الرعاية الصحية الأولية                 ", "name_ar": "الرعاية الصحية الأولية                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/PHCCQatar"},
+    {"id": 10726 ,"name": "مركز قطر المالي QFC                          ", "name_ar": "مركز قطر المالي                              ", "country": "قطر", "type": "حكومي", "lang": "en", "url": "https://rsshub.app/twitter/user/QFCAuthority"},
+    {"id": 10727 ,"name": "بورصة قطر                                    ", "name_ar": "بورصة قطر                                    ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QSE_Qatar"},
+    {"id": 10728 ,"name": "قطر للسكك الحديدية                           ", "name_ar": "مترو الدوحة                                  ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarRail"},
+    {"id": 10729 ,"name": "قطر للطاقة                                   ", "name_ar": "قطر للطاقة                                   ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarEnergy"},
+    {"id": 10730 ,"name": "قطر للطاقة RSS                               ", "name_ar": "قطر للطاقة أخبار                             ", "country": "قطر", "type": "حكومي", "lang": "en", "url": "https://www.qatarenergy.com.qa/En/MediaCentre/NewsReleases/PublishingImages/Pages/rss.aspx"},
+    {"id": 10731 ,"name": "هيئة الطيران المدني قطر                      ", "name_ar": "هيئة الطيران المدني                          ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarCAA"},
+    {"id": 10732 ,"name": "مواصلات قطر                                  ", "name_ar": "مواصلات                                      ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/MowasalatQatar"},
+    {"id": 10733 ,"name": "بريد قطر                                     ", "name_ar": "بريد قطر                                     ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarPost_Rihal"},
+    {"id": 10734 ,"name": "بنك قطر للتنمية                              ", "name_ar": "بنك قطر للتنمية QDB                          ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QDB_Qatar"},
+    {"id": 10735 ,"name": "الهلال الأحمر القطري                         ", "name_ar": "الهلال الأحمر القطري                         ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/qatarredcres"},
+    {"id": 10736 ,"name": "جامعة قطر                                    ", "name_ar": "جامعة قطر                                    ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarUniversity"},
+    {"id": 10737 ,"name": "متاحف قطر                                    ", "name_ar": "متاحف قطر                                    ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarMuseums"},
+    {"id": 10738 ,"name": "المكتبة الوطنية قطر                          ", "name_ar": "المكتبة الوطنية قطر                          ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QNLHQ"},
+    {"id": 10739 ,"name": "قطر تشاريتي                                  ", "name_ar": "قطر تشاريتي                                  ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarCharity"},
+    {"id": 10740 ,"name": "الجهاز المركزي للإحصاء                       ", "name_ar": "الجهاز المركزي للإحصاء PSA                   ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/psa_qatar"},
+    {"id": 10741 ,"name": "وقود قطر                                     ", "name_ar": "وقود WOQOD                                   ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/WoqodQatar"},
+    {"id": 10742 ,"name": "اللجنة العليا قطر 2022                       ", "name_ar": "اللجنة العليا للمشاريع والإرث                ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/theqatarsc"},
+    {"id": 10743 ,"name": "المناطق الحرة قطر                            ", "name_ar": "المناطق الحرة بقطر QFZA                      ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QFZA_Qatar"},
+    {"id": 10744 ,"name": "صندوق قطر للبحث العلمي                       ", "name_ar": "مجلس البحث العلمي QNRF                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QNRF_Qatar"},
+    {"id": 10745 ,"name": "وكالة الفضاء القطرية                         ", "name_ar": "وكالة الفضاء القطرية                         ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarSpaceAgency"},
+    {"id": 10746 ,"name": "هيئة الاتصالات قطر                           ", "name_ar": "هيئة الاتصالات CTRA                          ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/CTRA_Qatar"},
+    {"id": 10747 ,"name": "هيئة الأسواق المالية                         ", "name_ar": "هيئة الأسواق المالية QFMA                    ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QFMA_Qatar"},
+    {"id": 10748 ,"name": "هيئة حقوق الإنسان قطر                        ", "name_ar": "هيئة حقوق الإنسان                            ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/nhrcqatar"},
+    {"id": 10749 ,"name": "معهد الدوحة للسياسات                         ", "name_ar": "معهد الدوحة للسياسات العامة                  ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/DohaInstitute"},
+    {"id": 10750 ,"name": "مشيرب بروبرتيز                               ", "name_ar": "مشيرب للعقارات                               ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/Msheireb"},
+    {"id": 10751 ,"name": "مدينة لوسيل                                  ", "name_ar": "مدينة لوسيل                                  ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/LusailCity_Q"},
+    {"id": 10752 ,"name": "ميلاحة قطر                                   ", "name_ar": "ميلاحة                                       ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/milahaQatar"},
+    {"id": 10753 ,"name": "الأرصاد الجوية قطر                           ", "name_ar": "الأرصاد الجوية قطر                           ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QMDQatar"},
+    {"id": 10754 ,"name": "الجامعة العربية المفتوحة                     ", "name_ar": "الجامعة العربية المفتوحة                     ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/aou_qatar"},
+    {"id": 10755 ,"name": "البنك المركزي القطري                         ", "name_ar": "البنك المركزي القطري QCB                     ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QCB_QatarCB"},
+    {"id": 10756 ,"name": "شركة قطر للكهرباء والماء                     ", "name_ar": "قطر للكهرباء والماء                          ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/qewcQatar"},
+    {"id": 10757 ,"name": "هيئة العقارات قطر                            ", "name_ar": "هيئة العقارات قطر                            ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/RealEstateQatar"},
+    {"id": 10758 ,"name": "المجلس الوطني للسياحة                        ", "name_ar": "المجلس الوطني للسياحة                        ", "country": "قطر", "type": "حكومي", "lang": "ar", "url": "https://rsshub.app/twitter/user/QatarTourism"},
+    {"id": 10759 ,"name": "الراية القطرية RSS                           ", "name_ar": "الراية                                       ", "country": "قطر", "type": "صحيفة", "lang": "ar", "url": "https://www.raya.com/home/rss"},
+    {"id": 10760 ,"name": "Gulf Times Qatar                             ", "name_ar": "Gulf Times                                   ", "country": "قطر", "type": "صحيفة", "lang": "en", "url": "https://gulf-times.com/rss/tp"},
+    {"id": 10761 ,"name": "Qatar Tribune                                ", "name_ar": "Qatar Tribune                                ", "country": "قطر", "type": "صحيفة", "lang": "en", "url": "https://www.qatar-tribune.com/rss/"},
+    {"id": 10762 ,"name": "Lusail News قطر                              ", "name_ar": "لوسيل نيوز                                   ", "country": "قطر", "type": "رقمي", "lang": "ar", "url": "https://lusailnews.net/feed/"},
+    {"id": 10763 ,"name": "ILoveQatar                                   ", "name_ar": "آي لاف قطر                                   ", "country": "قطر", "type": "رقمي", "lang": "en", "url": "https://www.iloveqatar.net/feed/"},
+    {"id": 10764 ,"name": "Qatarday                                     ", "name_ar": "يوم قطر                                      ", "country": "قطر", "type": "رقمي", "lang": "en", "url": "https://www.qatarday.com/rss"},
+    {"id": 10765 ,"name": "عرب تايمز قطر                                ", "name_ar": "عرب تايمز قطر                                ", "country": "قطر", "type": "رقمي", "lang": "ar", "url": "https://arabictimes.qa/feed/"},
+    {"id": 10766 ,"name": "نبض قطر                                      ", "name_ar": "نبض قطر                                      ", "country": "قطر", "type": "رقمي", "lang": "ar", "url": "https://nabdqatar.com/feed/"},
+
+    # ══════════════════════════════════════════
+    # الجهات الحكومية القطرية (وزارات + هيئات + تويتر rsshub)
+    # ══════════════════════════════════════════
+
 
 ]
