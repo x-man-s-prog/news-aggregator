@@ -342,6 +342,12 @@ def manual_refresh():
     threading.Thread(target=_fetch_and_send, daemon=True).start()
     return jsonify({"status":"جاري التحديث..."})
 
+@app.route("/api/send-now", methods=["POST"])
+def send_now():
+    """إرسال الأخبار غير المُرسَلة للمجموعة فوراً"""
+    threading.Thread(target=_send_news_to_group, daemon=True).start()
+    return jsonify({"status":"جاري الإرسال للمجموعة..."})
+
 @app.route("/api/continents")
 def get_continents():
     conn = get_db()
@@ -387,10 +393,10 @@ def _tg_send(text: str) -> None:
     if not BOT1_TOKEN or not GROUP_ID:
         return
     try:
-        payload = json.dumps({"chat_id": GROUP_ID, "text": text}).encode()
+        payload = json.dumps({"chat_id": GROUP_ID, "text": text}, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(
             f"https://api.telegram.org/bot{BOT1_TOKEN}/sendMessage",
-            data=payload, headers={"Content-Type": "application/json"})
+            data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
         urllib.request.urlopen(req, timeout=10)
     except Exception as e:
         log.warning("TG send error: %s", e)
