@@ -536,8 +536,8 @@ def _tg_poll_commands():
 # البوت الثاني @news_87687bot — ملخص كل 10 دقائق
 # ══════════════════════════════════════════════════════════
 BOT2_TOKEN   = os.getenv("BOT2_TOKEN", "8524207838:AAHhSgp6WgdPXjBOP-LsbYx2oFFJGf-1LPo")
-BOT2_DEST    = os.getenv("BOT2_DEST",  "-1003782532470")   # نفس المجموعة
 BOT2_INTERVAL = 10 * 60   # كل 10 دقائق
+BOT2_DESTS   = ["-1003782532470", "915765345"]  # المجموعة + الخاص
 
 # خريطة أعلام الدول
 _FLAGS = {
@@ -560,18 +560,23 @@ def _flag(country: str) -> str:
     return "🌐"
 
 def _bot2_send(text: str) -> None:
-    if not BOT2_TOKEN or not BOT2_DEST: return
-    try:
-        payload = json.dumps(
-            {"chat_id": BOT2_DEST, "text": text, "parse_mode": "HTML",
-             "disable_web_page_preview": True},
-            ensure_ascii=False).encode("utf-8")
-        req = urllib.request.Request(
-            f"https://api.telegram.org/bot{BOT2_TOKEN}/sendMessage",
-            data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
-        urllib.request.urlopen(req, timeout=15)
-    except Exception as e:
-        log.warning("Bot2 send error: %s", e)
+    if not BOT2_TOKEN: return
+    def _send_one(cid):
+        try:
+            payload = json.dumps(
+                {"chat_id": cid, "text": text, "parse_mode": "HTML",
+                 "disable_web_page_preview": True},
+                ensure_ascii=False).encode("utf-8")
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{BOT2_TOKEN}/sendMessage",
+                data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+            urllib.request.urlopen(req, timeout=15)
+        except Exception as e:
+            log.warning("Bot2 send error [%s]: %s", cid, e)
+    # إرسال متوازٍ للمجموعة والخاص
+    threads = [threading.Thread(target=_send_one, args=(cid,), daemon=True) for cid in BOT2_DESTS]
+    for t in threads: t.start()
+    for t in threads: t.join(timeout=20)
 
 def _bot2_digest_worker():
     """يرسل ملخص الأخبار كل 10 دقائق عبر @news_87687bot"""
