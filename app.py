@@ -532,11 +532,116 @@ def _tg_poll_commands():
             time.sleep(5)
 
 
+# ══════════════════════════════════════════════════════════
+# البوت الثاني @news_87687bot — ملخص كل 10 دقائق
+# ══════════════════════════════════════════════════════════
+BOT2_TOKEN   = os.getenv("BOT2_TOKEN", "8524207838:AAHhSgp6WgdPXjBOP-LsbYx2oFFJGf-1LPo")
+BOT2_DEST    = os.getenv("BOT2_DEST",  "-1003782532470")   # نفس المجموعة
+BOT2_INTERVAL = 10 * 60   # كل 10 دقائق
+
+# خريطة أعلام الدول
+_FLAGS = {
+    "قطر":"🇶🇦","السعودية":"🇸🇦","الإمارات":"🇦🇪","الكويت":"🇰🇼","البحرين":"🇧🇭","عُمان":"🇴🇲",
+    "اليمن":"🇾🇪","العراق":"🇮🇶","سوريا":"🇸🇾","لبنان":"🇱🇧","الأردن":"🇯🇴","فلسطين":"🇵🇸",
+    "مصر":"🇪🇬","ليبيا":"🇱🇾","تونس":"🇹🇳","الجزائر":"🇩🇿","المغرب":"🇲🇦","السودان":"🇸🇩",
+    "موريتانيا":"🇲🇷","الصومال":"🇸🇴","إيران":"🇮🇷","تركيا":"🇹🇷","إسرائيل":"🇮🇱",
+    "أمريكا":"🇺🇸","بريطانيا":"🇬🇧","فرنسا":"🇫🇷","ألمانيا":"🇩🇪","روسيا":"🇷🇺",
+    "الصين":"🇨🇳","الهند":"🇮🇳","اليابان":"🇯🇵","كوريا الجنوبية":"🇰🇷","إيطاليا":"🇮🇹",
+    "إسبانيا":"🇪🇸","البرتغال":"🇵🇹","هولندا":"🇳🇱","بلجيكا":"🇧🇪","سويسرا":"🇨🇭",
+    "السويد":"🇸🇪","النرويج":"🇳🇴","الدنمارك":"🇩🇰","فنلندا":"🇫🇮","أوكرانيا":"🇺🇦",
+    "بولندا":"🇵🇱","اليونان":"🇬🇷","أستراليا":"🇦🇺","كندا":"🇨🇦","البرازيل":"🇧🇷",
+    "الأرجنتين":"🇦🇷","باكستان":"🇵🇰","أفريقيا":"🌍","أوروبا":"🌍","دولي":"🌐",
+    "الخليج":"🌍","الشرق الأوسط":"🌍",
+}
+
+def _flag(country: str) -> str:
+    for k, v in _FLAGS.items():
+        if k in country: return v
+    return "🌐"
+
+def _bot2_send(text: str) -> None:
+    if not BOT2_TOKEN or not BOT2_DEST: return
+    try:
+        payload = json.dumps(
+            {"chat_id": BOT2_DEST, "text": text, "parse_mode": "HTML",
+             "disable_web_page_preview": True},
+            ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{BOT2_TOKEN}/sendMessage",
+            data=payload, headers={"Content-Type": "application/json; charset=utf-8"})
+        urllib.request.urlopen(req, timeout=15)
+    except Exception as e:
+        log.warning("Bot2 send error: %s", e)
+
+def _bot2_digest_worker():
+    """يرسل ملخص الأخبار كل 10 دقائق عبر @news_87687bot"""
+    log.info("📋 Bot2 digest worker يعمل (كل %d دقيقة)...", BOT2_INTERVAL // 60)
+    # انتظر أول دورة جلب تنتهي
+    time.sleep(120)
+    while True:
+        try:
+            conn = get_db()
+            rows = conn.execute(
+                """SELECT arabic_title, summary_ar, summary, country, source_ar, source, link
+                   FROM news
+                   WHERE fetched_at >= datetime('now', ?)
+                   ORDER BY country, fetched_at DESC""",
+                (f"-{BOT2_INTERVAL + 60} seconds",)
+            ).fetchall()
+            conn.close()
+
+            if not rows:
+                log.info("Bot2: لا أخبار جديدة في آخر 10 دقائق")
+                time.sleep(BOT2_INTERVAL)
+                continue
+
+            # بناء الرسالة
+            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+            lines   = [f"📰 <b>ملخص أخبار — {now_str}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+
+            for row in rows:
+                title   = row["arabic_title"] or row["source_ar"] or ""
+                summary = (row["summary_ar"] or row["summary"] or "")[:120]
+                country = row["country"] or "دولي"
+                flag    = _flag(country)
+                # سطر واحد: 🇶🇦 قطر | العنوان المختصر
+                headline = title[:90] if title else summary[:90]
+                if headline:
+                    lines.append(f"{flag} <b>{country}</b> | {headline}")
+
+            lines.append(f"━━━━━━━━━━━━━━━━━━━━\n📊 {len(rows)} خبر")
+
+            # إرسال — إذا الرسالة كبيرة قسّمها
+            full_msg = "\n".join(lines)
+            if len(full_msg) <= 4096:
+                _bot2_send(full_msg)
+            else:
+                # قسّم على دفعات
+                chunk, count = [lines[0]], 0
+                for line in lines[1:]:
+                    if sum(len(l)+1 for l in chunk) + len(line) > 3800:
+                        _bot2_send("\n".join(chunk))
+                        time.sleep(2)
+                        chunk = []
+                        count += 1
+                    chunk.append(line)
+                if chunk:
+                    _bot2_send("\n".join(chunk))
+
+            log.info("Bot2: أُرسل ملخص %d خبر", len(rows))
+
+        except Exception as e:
+            log.warning("Bot2 digest error: %s", e)
+
+        time.sleep(BOT2_INTERVAL)
+
+
 init_db()
 threading.Thread(target=background_worker,     daemon=True).start()
 threading.Thread(target=_memory_watchdog,      daemon=True).start()
 threading.Thread(target=_tg_poll_commands,     daemon=True).start()
 threading.Thread(target=_tg_sender_worker,     daemon=True).start()  # إرسال فوري
+threading.Thread(target=_bot2_digest_worker,   daemon=True).start()  # ملخص كل 10 دقائق
 
 
 if __name__ == "__main__":
