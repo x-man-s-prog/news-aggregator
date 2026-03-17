@@ -533,10 +533,10 @@ def _tg_poll_commands():
 
 
 # ══════════════════════════════════════════════════════════
-# البوت الثاني @news_87687bot — ملخص كل 10 دقائق
+# البوت الثاني @news_87687bot — ملخص كل 5 دقائق
 # ══════════════════════════════════════════════════════════
 BOT2_TOKEN   = os.getenv("BOT2_TOKEN", "8524207838:AAHhSgp6WgdPXjBOP-LsbYx2oFFJGf-1LPo")
-BOT2_INTERVAL = 10 * 60   # كل 10 دقائق
+BOT2_INTERVAL = 5 * 60    # كل 5 دقائق
 BOT2_DESTS   = ["-1003782532470", "915765345"]  # المجموعة + الخاص
 
 # خريطة أعلام الدول
@@ -579,17 +579,18 @@ def _bot2_send(text: str) -> None:
     for t in threads: t.join(timeout=20)
 
 def _bot2_digest_worker():
-    """يرسل ملخص الأخبار كل 10 دقائق عبر @news_87687bot"""
+    """يرسل ملخص الأخبار كل 5 دقائق عبر @news_87687bot — المصدر: قاعدة بيانات البوت الأول فقط"""
     log.info("📋 Bot2 digest worker يعمل (كل %d دقيقة)...", BOT2_INTERVAL // 60)
-    # أول تشغيل: انتظر 3 دقائق فقط ثم أرسل ملخص آخر 30 دقيقة
-    time.sleep(180)
+    # أول تشغيل: انتظر 90 ثانية فقط ثم أرسل ملخص آخر 30 دقيقة
+    time.sleep(90)
     first_run = True
     while True:
         try:
-            # أول تشغيل يأخذ آخر 30 دقيقة، بعدها كل 10 دقائق
+            # أول تشغيل يأخذ آخر 30 دقيقة، بعدها نافذة الـ 5 دقائق + هامش 60 ثانية
             window = "-30 minutes" if first_run else f"-{BOT2_INTERVAL + 60} seconds"
             first_run = False
 
+            # المصدر الوحيد: جدول news في قاعدة البيانات (نفس DB التي يكتب فيها البوت الأول)
             conn = get_db()
             rows = conn.execute(
                 """SELECT arabic_title, summary_ar, summary, country, source_ar, source, link
@@ -599,6 +600,7 @@ def _bot2_digest_worker():
                 (window,)
             ).fetchall()
             conn.close()
+            log.info("Bot2: استعلام DB window=%s → %d صف", window, len(rows))
 
             if not rows:
                 log.info("Bot2: لا أخبار جديدة")
@@ -656,7 +658,7 @@ threading.Thread(target=background_worker,     daemon=True).start()
 threading.Thread(target=_memory_watchdog,      daemon=True).start()
 threading.Thread(target=_tg_poll_commands,     daemon=True).start()
 threading.Thread(target=_tg_sender_worker,     daemon=True).start()  # إرسال فوري
-threading.Thread(target=_bot2_digest_worker,   daemon=True).start()  # ملخص كل 10 دقائق
+threading.Thread(target=_bot2_digest_worker,   daemon=True).start()  # ملخص كل 5 دقائق
 
 
 if __name__ == "__main__":
