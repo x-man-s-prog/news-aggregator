@@ -559,6 +559,63 @@ def _flag(country: str) -> str:
         if k in country: return v
     return "🌐"
 
+# ── نظام تقييم الأخبار لاختيار الأهم سياسياً وعالمياً ──
+_KW_SCORES = {
+    # أمن وعمليات عسكرية
+    "حرب":6,"غزو":6,"اغتيال":6,"انقلاب":6,"قصف":6,"ضربة جوية":6,
+    "هجوم":5,"انفجار":5,"قتلى":5,"مقتل":5,"ضحايا":5,"جرحى":4,
+    "اشتباك":4,"عملية عسكرية":5,"توغل":5,"احتلال":5,
+    # دبلوماسية وسياسة عليا
+    "قمة":5,"اتفاق":4,"معاهدة":5,"اتفاقية":4,"مفاوضات":4,
+    "محادثات":3,"مباحثات":3,"وقف إطلاق النار":6,"هدنة":5,
+    "عقوبات":4,"حصار":4,"طرد السفير":5,
+    "رئيس":3,"ملك":3,"أمير":3,"وزير الخارجية":4,
+    "انتخاب":4,"استفتاء":4,"برلمان":3,
+    # أزمات وطوارئ
+    "أزمة":4,"تصعيد":4,"توتر":3,"طوارئ":4,"كارثة":5,
+    "زلزال":4,"فيضان":4,"مجاعة":5,
+    # عاجل
+    "عاجل":5,"طارئ":4,"عاجل جداً":6,
+    # اقتصاد مؤثر
+    "نفط":2,"أسعار النفط":3,"ركود":3,"أزمة اقتصادية":4,
+}
+
+_COUNTRY_SCORES = {
+    "أمريكا":4,"الولايات المتحدة":4,"روسيا":4,"الصين":4,
+    "إسرائيل":4,"فلسطين":4,"غزة":5,"أوكرانيا":4,
+    "إيران":3,"السعودية":3,"قطر":3,"تركيا":3,
+    "كوريا الشمالية":4,"كوريا":3,"اليابان":2,
+    "بريطانيا":3,"فرنسا":3,"ألمانيا":3,
+    "اليمن":3,"سوريا":3,"العراق":2,"لبنان":2,"السودان":3,
+    "باكستان":2,"الهند":2,
+}
+
+_SOURCE_SCORES = {
+    "reuters":3,"رويترز":3,"bloomberg":3,"بلومبرغ":3,
+    "bbc":3,"بي بي سي":3,"ap":3,"أسوشيتد برس":3,
+    "afp":3,"أ ف ب":3,"الجزيرة":3,"cnn":2,"سكاي نيوز":2,
+    "واشنطن بوست":2,"نيويورك تايمز":2,"الغارديان":2,
+}
+
+def _score_article(row) -> int:
+    """يحسب درجة أهمية الخبر للفلترة السياسية والعالمية"""
+    score = 0
+    title   = (row["arabic_title"] or "").lower()
+    country = (row["country"] or "").lower()
+    source  = ((row["source_ar"] or "") + " " + (row["source"] or "")).lower()
+    for kw, pts in _KW_SCORES.items():
+        if kw in title:
+            score += pts
+    for c, pts in _COUNTRY_SCORES.items():
+        if c.lower() in country:
+            score += pts
+            break
+    for s, pts in _SOURCE_SCORES.items():
+        if s in source:
+            score += pts
+            break
+    return score
+
 def _bot2_send(text: str) -> None:
     if not BOT2_TOKEN: return
     def _send_one(cid):
@@ -616,11 +673,14 @@ def _bot2_digest_worker():
                     seen_titles.add(t)
                     unique_rows.append(row)
 
+            # اختيار أهم 20 خبر سياسياً وعالمياً بنظام التقييم
+            top_news = sorted(unique_rows, key=_score_article, reverse=True)[:20]
+
             # بناء الرسالة
             now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
             lines   = [f"📰 <b>ملخص أخبار — {now_str}</b>\n━━━━━━━━━━━━━━━━━━━━"]
 
-            for row in unique_rows:
+            for row in top_news:
                 title   = row["arabic_title"] or row["source_ar"] or ""
                 country = row["country"] or "دولي"
                 flag    = _flag(country)
@@ -628,7 +688,7 @@ def _bot2_digest_worker():
                 if headline:
                     lines.append(f"{flag} <b>{country}</b> | {headline}")
 
-            lines.append(f"━━━━━━━━━━━━━━━━━━━━\n📊 {len(unique_rows)} خبر")
+            lines.append(f"━━━━━━━━━━━━━━━━━━━━\n📊 {len(top_news)} خبر من أصل {len(unique_rows)}")
 
             # إرسال — قسّم إذا تجاوز 4096
             full_msg = "\n".join(lines)
@@ -645,7 +705,7 @@ def _bot2_digest_worker():
                 if len(chunk) > 1:
                     _bot2_send("\n".join(chunk))
 
-            log.info("Bot2: أُرسل ملخص %d خبر", len(unique_rows))
+            log.info("Bot2: أُرسل ملخص %d خبر (من أصل %d)", len(top_news), len(unique_rows))
 
         except Exception as e:
             log.warning("Bot2 digest error: %s", e)
